@@ -8,9 +8,12 @@ export const prominentDisplacementMap =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAABVXElEQVR4nO19aZasPKxkuE5toffS+1/YR/8AS6GQZAxZd3qvffJQtjEe5AgNQGaN//N/caZxAAAODFyZsnLcnZIGz47UiVVeNeWpWDlmJbhILW8rv7oaYBz4SpWS+ZJKuwofHMeVH8DXoFMjVHpmXFdJpR1zzRipWFUiVYJaIlVCLpynQO0fHRE7uQ5Vg/JUUQl8TfyeoAXGzJyVI1aemVGdSg24WXtEPKYLdWJ0lQ4HHOdnIKdjzLP04eGsZ+4csbeDelukY3XyfVqO6Ts6ciWdGtyIQKOfajAjlXVneAL1HCCYpzGy1O9xn4fDI/RLe6r6YhxkqKECes0BaZBwoFgHXZV4pVBrRufKg4U1LzHckwwSYSrQBy2ANh1RSkXLNWxvU7qcEQPUSM2XOqYjGQTQRQOB3UQVVwT8WauIvzBtsQZpcFlT2tiI9Y3RS25gmlM844DtdOSANkhHNC35KKbALj9AGYFanCrguAe1KVJFBk4lB9Qu7ej71xy4u3DkzNCa3M0C9N3ozgSqYmIMqhzDL/EpRaDL1o9UA9SmYFRtHP2ZGFIpg5oL9JIDdCo36Jhw5LPwOeyYgtII5KLN8yBWiC/ELTGUBsdz6LMxDOsKuFum4Q40WJaj7mBNA2GCQm1WDkL5IKco9Euw1uIInd8r/nTK8jsu0KhGeYF+DHxZB7ccCGcZyjMVHtGaC";
 
 // Generate shader-based displacement map using shader utilities
-export const generateShaderDisplacementMap = (width: number, height: number): string => {
-  const { ShaderDisplacementGenerator, fragmentShaders } = require('./utils');
-  
+export const generateShaderDisplacementMap = (
+  width: number,
+  height: number,
+): string => {
+  const { ShaderDisplacementGenerator, fragmentShaders } = require("./utils");
+
   const generator = new ShaderDisplacementGenerator({
     width,
     height,
@@ -23,7 +26,10 @@ export const generateShaderDisplacementMap = (width: number, height: number): st
   return dataUrl;
 };
 
-export const getMap = (mode: "standard" | "polar" | "prominent" | "shader", shaderMapUrl?: string) => {
+export const getMap = (
+  mode: "standard" | "polar" | "prominent" | "shader",
+  shaderMapUrl?: string,
+) => {
   switch (mode) {
     case "standard":
       return displacementMap;
@@ -36,4 +42,4 @@ export const getMap = (mode: "standard" | "polar" | "prominent" | "shader", shad
     default:
       throw new Error(`Invalid mode: ${mode}`);
   }
-}; 
+};

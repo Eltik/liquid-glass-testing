@@ -117,8 +117,8 @@ export default function Home() {
               Responsive Liquid Glass Wrapper Demo
             </h1>
             <p className="text-sm opacity-90">
-              Interactive navbar examples • Drag elements around • Use resize
-              controls • Fully responsive
+              Interactive navbar examples • Drag elements around • Compare
+              frosted vs original glass styles • Fully responsive
             </p>
           </div>
         </div>
@@ -272,6 +272,82 @@ export default function Home() {
           <span className="text-sm font-semibold text-white">
             New Feature 🎉
           </span>
+        </LiquidGlass>
+
+        {/* Original Example 3 Style - Simple Glass */}
+        <LiquidGlass
+          padding="16px 24px"
+          cornerRadius={12}
+          initialPosition={{ x: 950, y: 450 }}
+          displacementScale={30}
+          frosted={false}
+          className="shadow-lg"
+        >
+          <div className="text-center text-white">
+            <div className="mb-2 text-2xl">🪟</div>
+            <h3 className="mb-1 text-sm font-bold">Original Glass</h3>
+            <p className="text-xs opacity-80">Simple, clean look</p>
+          </div>
+        </LiquidGlass>
+
+        {/* Frosted Glass Comparison */}
+        <LiquidGlass
+          padding="16px 24px"
+          cornerRadius={12}
+          initialPosition={{ x: 750, y: 450 }}
+          displacementScale={30}
+          frosted={true}
+          mode="standard"
+          aberrationIntensity={3}
+          className="shadow-lg"
+        >
+          <div className="text-center text-white">
+            <div className="mb-2 text-2xl">✨</div>
+            <h3 className="mb-1 text-sm font-bold">Frosted Glass</h3>
+            <p className="text-xs opacity-80">Advanced effects</p>
+          </div>
+        </LiquidGlass>
+
+        {/* Simple Glass Navigation - Example 3 Style */}
+        <LiquidGlass
+          padding="12px 20px"
+          cornerRadius={8}
+          initialPosition={{ x: 300, y: 150 }}
+          displacementScale={25}
+          frosted={false}
+          className="shadow-lg"
+        >
+          <nav className="flex items-center space-x-4 text-white">
+            <div className="text-base font-bold">Simple</div>
+            <div className="flex space-x-3">
+              {["Home", "About"].map((item) => (
+                <button
+                  key={item}
+                  className="rounded px-2 py-1 text-sm transition-all hover:bg-white/20"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </nav>
+        </LiquidGlass>
+
+        {/* Polar Mode Example */}
+        <LiquidGlass
+          padding="20px"
+          cornerRadius={16}
+          initialPosition={{ x: 1100, y: 300 }}
+          displacementScale={40}
+          frosted={true}
+          mode="polar"
+          aberrationIntensity={4}
+          className="shadow-lg"
+        >
+          <div className="text-center text-white">
+            <div className="mb-2 text-3xl">🌀</div>
+            <h3 className="mb-1 text-base font-bold">Polar Mode</h3>
+            <p className="text-xs opacity-80">Radial distortion</p>
+          </div>
         </LiquidGlass>
 
         {/* Large Content Example */}
