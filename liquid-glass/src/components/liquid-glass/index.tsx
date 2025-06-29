@@ -1,5 +1,110 @@
-import { useRef, useEffect, useCallback, useState, forwardRef } from "react";
+import { useRef, useEffect, useCallback, useState, forwardRef, useId } from "react";
 import { utils } from "./impl/utils";
+import { displacementMap, polarDisplacementMap, prominentDisplacementMap, generateShaderDisplacementMap, getMap } from "./impl/displacement-maps";
+
+/* ---------- Advanced SVG filter with chromatic aberration ---------- */
+const AdvancedGlassFilter: React.FC<{ 
+  id: string; 
+  displacementScale: number; 
+  aberrationIntensity: number; 
+  width: number; 
+  height: number; 
+  mode: "standard" | "polar" | "prominent" | "shader"; 
+  shaderMapUrl?: string;
+}> = ({
+  id,
+  displacementScale,
+  aberrationIntensity,
+  width,
+  height,
+  mode,
+  shaderMapUrl,
+}) => (
+  <svg style={{ position: "absolute", width, height }} aria-hidden="true">
+    <defs>
+      <radialGradient id={`${id}-edge-mask`} cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="black" stopOpacity="0" />
+        <stop offset={`${Math.max(30, 80 - aberrationIntensity * 2)}%`} stopColor="black" stopOpacity="0" />
+        <stop offset="100%" stopColor="white" stopOpacity="1" />
+      </radialGradient>
+      <filter id={id} x="-35%" y="-35%" width="170%" height="170%" colorInterpolationFilters="sRGB">
+        <feImage id="feimage" x="0" y="0" width="100%" height="100%" result="DISPLACEMENT_MAP" href={getMap(mode, shaderMapUrl)} preserveAspectRatio="xMidYMid slice" />
+
+        {/* Create edge mask using the displacement map itself */}
+        <feColorMatrix
+          in="DISPLACEMENT_MAP"
+          type="matrix"
+          values="0.3 0.3 0.3 0 0
+                 0.3 0.3 0.3 0 0
+                 0.3 0.3 0.3 0 0
+                 0 0 0 1 0"
+          result="EDGE_INTENSITY"
+        />
+        <feComponentTransfer in="EDGE_INTENSITY" result="EDGE_MASK">
+          <feFuncA type="discrete" tableValues={`0 ${aberrationIntensity * 0.05} 1`} />
+        </feComponentTransfer>
+
+        {/* Original undisplaced image for center */}
+        <feOffset in="SourceGraphic" dx="0" dy="0" result="CENTER_ORIGINAL" />
+
+        {/* Red channel displacement with slight offset */}
+        <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * (mode === "shader" ? 1 : -1)} xChannelSelector="R" yChannelSelector="B" result="RED_DISPLACED" />
+        <feColorMatrix
+          in="RED_DISPLACED"
+          type="matrix"
+          values="1 0 0 0 0
+                 0 0 0 0 0
+                 0 0 0 0 0
+                 0 0 0 1 0"
+          result="RED_CHANNEL"
+        />
+
+        {/* Green channel displacement */}
+        <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * ((mode === "shader" ? 1 : -1) - aberrationIntensity * 0.05)} xChannelSelector="R" yChannelSelector="B" result="GREEN_DISPLACED" />
+        <feColorMatrix
+          in="GREEN_DISPLACED"
+          type="matrix"
+          values="0 0 0 0 0
+                 0 1 0 0 0
+                 0 0 0 0 0
+                 0 0 0 1 0"
+          result="GREEN_CHANNEL"
+        />
+
+        {/* Blue channel displacement with slight offset */}
+        <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * ((mode === "shader" ? 1 : -1) - aberrationIntensity * 0.1)} xChannelSelector="R" yChannelSelector="B" result="BLUE_DISPLACED" />
+        <feColorMatrix
+          in="BLUE_DISPLACED"
+          type="matrix"
+          values="0 0 0 0 0
+                 0 0 0 0 0
+                 0 0 1 0 0
+                 0 0 0 1 0"
+          result="BLUE_CHANNEL"
+        />
+
+        {/* Combine all channels with screen blend mode for chromatic aberration */}
+        <feBlend in="GREEN_CHANNEL" in2="BLUE_CHANNEL" mode="screen" result="GB_COMBINED" />
+        <feBlend in="RED_CHANNEL" in2="GB_COMBINED" mode="screen" result="RGB_COMBINED" />
+
+        {/* Add slight blur to soften the aberration effect */}
+        <feGaussianBlur in="RGB_COMBINED" stdDeviation={Math.max(0.1, 0.5 - aberrationIntensity * 0.1)} result="ABERRATED_BLURRED" />
+
+        {/* Apply edge mask to aberration effect */}
+        <feComposite in="ABERRATED_BLURRED" in2="EDGE_MASK" operator="in" result="EDGE_ABERRATION" />
+
+        {/* Create inverted mask for center */}
+        <feComponentTransfer in="EDGE_MASK" result="INVERTED_MASK">
+          <feFuncA type="table" tableValues="1 0" />
+        </feComponentTransfer>
+        <feComposite in="CENTER_ORIGINAL" in2="INVERTED_MASK" operator="in" result="CENTER_CLEAN" />
+
+        {/* Combine edge aberration with clean center */}
+        <feComposite in="EDGE_ABERRATION" in2="CENTER_CLEAN" operator="over" />
+      </filter>
+    </defs>
+  </svg>
+);
 
 interface LiquidGlassProps {
   children?: React.ReactNode;
@@ -18,6 +123,14 @@ interface LiquidGlassProps {
   draggable?: boolean;
   minWidth?: number;
   minHeight?: number;
+  aberrationIntensity?: number;
+  elasticity?: number;
+  globalMousePos?: { x: number; y: number };
+  mouseOffset?: { x: number; y: number };
+  mouseContainer?: React.RefObject<HTMLElement | null> | null;
+  overLight?: boolean;
+  mode?: "standard" | "polar" | "prominent" | "shader";
+  onClick?: () => void;
 }
 
 const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
@@ -39,6 +152,14 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       draggable = true,
       minWidth = 100,
       minHeight = 50,
+      aberrationIntensity = 2,
+      elasticity = 0.15,
+      globalMousePos: externalGlobalMousePos,
+      mouseOffset: externalMouseOffset,
+      mouseContainer = null,
+      overLight = false,
+      mode = "standard",
+      onClick,
       ...props
     },
     ref,
@@ -63,9 +184,21 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
     });
     const [isDragging, setIsDragging] = useState(false);
     const [contentMeasured, setContentMeasured] = useState(false);
+    
+    // New state from example 2
+    const [isHovered, setIsHovered] = useState(false);
+    const [isActive, setIsActive] = useState(false);
+    const [shaderMapUrl, setShaderMapUrl] = useState<string>("");
+    const [internalGlobalMousePos, setInternalGlobalMousePos] = useState({ x: 0, y: 0 });
+    const [internalMouseOffset, setInternalMouseOffset] = useState({ x: 0, y: 0 });
+
+    // Use external mouse position if provided, otherwise use internal
+    const globalMousePos = externalGlobalMousePos ?? internalGlobalMousePos;
+    const mouseOffset = externalMouseOffset ?? internalMouseOffset;
 
     const canvasDPI = 1;
     const offset = 10; // Viewport boundary offset
+    const filterId = useId();
 
     // Fragment shader function - creates the liquid glass distortion
     const fragmentShader = useCallback((uv: { x: number; y: number }) => {
@@ -248,6 +381,120 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       [glassSize.width, glassSize.height, offset],
     );
 
+    // Internal mouse tracking from example 2
+    const handleMouseMove = useCallback(
+      (e: MouseEvent) => {
+        const container = mouseContainer?.current ?? containerRef.current;
+        if (!container) {
+          return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        setInternalMouseOffset({
+          x: ((e.clientX - centerX) / rect.width) * 100,
+          y: ((e.clientY - centerY) / rect.height) * 100,
+        });
+
+        setInternalGlobalMousePos({
+          x: e.clientX,
+          y: e.clientY,
+        });
+      },
+      [mouseContainer],
+    );
+
+    // Calculate directional scaling based on mouse position from example 2
+    const calculateDirectionalScale = useCallback(() => {
+      if (!globalMousePos.x || !globalMousePos.y || !containerRef.current) {
+        return "scale(1)";
+      }
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const pillCenterX = rect.left + rect.width / 2;
+      const pillCenterY = rect.top + rect.height / 2;
+      const pillWidth = glassSize.width;
+      const pillHeight = glassSize.height;
+
+      const deltaX = globalMousePos.x - pillCenterX;
+      const deltaY = globalMousePos.y - pillCenterY;
+
+      // Calculate distance from mouse to pill edges (not center)
+      const edgeDistanceX = Math.max(0, Math.abs(deltaX) - pillWidth / 2);
+      const edgeDistanceY = Math.max(0, Math.abs(deltaY) - pillHeight / 2);
+      const edgeDistance = Math.sqrt(edgeDistanceX * edgeDistanceX + edgeDistanceY * edgeDistanceY);
+
+      // Activation zone: 200px from edges
+      const activationZone = 200;
+
+      // If outside activation zone, no effect
+      if (edgeDistance > activationZone) {
+        return "scale(1)";
+      }
+
+      // Calculate fade-in factor (1 at edge, 0 at activation zone boundary)
+      const fadeInFactor = 1 - edgeDistance / activationZone;
+
+      // Normalize the deltas for direction
+      const centerDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      if (centerDistance === 0) {
+        return "scale(1)";
+      }
+
+      const normalizedX = deltaX / centerDistance;
+      const normalizedY = deltaY / centerDistance;
+
+      // Calculate stretch factors with fade-in
+      const stretchIntensity = Math.min(centerDistance / 300, 1) * (elasticity ?? 0.15) * fadeInFactor;
+
+      // X-axis scaling: stretch horizontally when moving left/right, compress when moving up/down
+      const scaleX = 1 + Math.abs(normalizedX) * stretchIntensity * 0.3 - Math.abs(normalizedY) * stretchIntensity * 0.15;
+
+      // Y-axis scaling: stretch vertically when moving up/down, compress when moving left/right
+      const scaleY = 1 + Math.abs(normalizedY) * stretchIntensity * 0.3 - Math.abs(normalizedX) * stretchIntensity * 0.15;
+
+      return `scaleX(${Math.max(0.8, scaleX)}) scaleY(${Math.max(0.8, scaleY)})`;
+    }, [globalMousePos, elasticity, glassSize]);
+
+    // Helper function to calculate fade-in factor based on distance from element edges
+    const calculateFadeInFactor = useCallback(() => {
+      if (!globalMousePos.x || !globalMousePos.y || !containerRef.current) {
+        return 0;
+      }
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const pillCenterX = rect.left + rect.width / 2;
+      const pillCenterY = rect.top + rect.height / 2;
+      const pillWidth = glassSize.width;
+      const pillHeight = glassSize.height;
+
+      const edgeDistanceX = Math.max(0, Math.abs(globalMousePos.x - pillCenterX) - pillWidth / 2);
+      const edgeDistanceY = Math.max(0, Math.abs(globalMousePos.y - pillCenterY) - pillHeight / 2);
+      const edgeDistance = Math.sqrt(edgeDistanceX * edgeDistanceX + edgeDistanceY * edgeDistanceY);
+
+      const activationZone = 200;
+      return edgeDistance > activationZone ? 0 : 1 - edgeDistance / activationZone;
+    }, [globalMousePos, glassSize]);
+
+    // Helper function to calculate elastic translation
+    const calculateElasticTranslation = useCallback(() => {
+      if (!containerRef.current) {
+        return { x: 0, y: 0 };
+      }
+
+      const fadeInFactor = calculateFadeInFactor();
+      const rect = containerRef.current.getBoundingClientRect();
+      const pillCenterX = rect.left + rect.width / 2;
+      const pillCenterY = rect.top + rect.height / 2;
+
+      return {
+        x: (globalMousePos.x - pillCenterX) * (elasticity ?? 0.15) * 0.1 * fadeInFactor,
+        y: (globalMousePos.y - pillCenterY) * (elasticity ?? 0.15) * 0.1 * fadeInFactor,
+      };
+    }, [globalMousePos, elasticity, calculateFadeInFactor]);
+
     // Handle drag functionality
     const handleMouseDown = useCallback(
       (e: React.MouseEvent) => {
@@ -307,6 +554,33 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       },
       [draggable, constrainPosition],
     );
+
+    // Generate shader displacement map when in shader mode
+    useEffect(() => {
+      if (mode === "shader") {
+        const url = generateShaderDisplacementMap(glassSize.width, glassSize.height);
+        setShaderMapUrl(url);
+      }
+    }, [mode, glassSize.width, glassSize.height]);
+
+    // Set up mouse tracking if no external mouse position is provided
+    useEffect(() => {
+      if (externalGlobalMousePos && externalMouseOffset) {
+        // External mouse tracking is provided, don't set up internal tracking
+        return;
+      }
+
+      const container = mouseContainer?.current ?? containerRef.current;
+      if (!container) {
+        return;
+      }
+
+      container.addEventListener("mousemove", handleMouseMove);
+
+      return () => {
+        container.removeEventListener("mousemove", handleMouseMove);
+      };
+    }, [handleMouseMove, mouseContainer, externalGlobalMousePos, externalMouseOffset]);
 
     // Setup canvas and initial shader update
     useEffect(() => {
@@ -389,29 +663,42 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       return () => window.removeEventListener("resize", handleResize);
     }, [position, constrainPosition]);
 
+    // Enhanced container styles with elastic effects
+    const transformStyle = draggable 
+      ? (position.centered
+          ? `translate(calc(-50% + ${calculateElasticTranslation().x}px), calc(-50% + ${calculateElasticTranslation().y}px)) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`
+          : `translate(${calculateElasticTranslation().x}px, ${calculateElasticTranslation().y}px) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`)
+      : (position.centered ? "translate(-50%, -50%)" : "none");
+
+    const isFirefox = navigator.userAgent.toLowerCase().includes("firefox");
+
+    const backdropStyle: React.CSSProperties = {
+      ...(isFirefox ? {} : { filter: `url(#${filterId})` }),
+      backdropFilter: `blur(${(overLight ? 12 : 4) + blurAmount * 32}px) saturate(${saturation}%)`,
+    };
+
     const containerStyle: React.CSSProperties = {
       width: glassSize.width,
       height: glassSize.height,
       overflow: "hidden",
       borderRadius: `${cornerRadius}px`,
-      boxShadow:
-        "0 4px 8px rgba(0, 0, 0, 0.25), 0 -10px 25px inset rgba(0, 0, 0, 0.15)",
-      cursor: draggable ? (isDragging ? "grabbing" : "grab") : "default",
-      backdropFilter: `url(#${id.current}_filter) blur(${blurAmount}px) contrast(${contrast}%) brightness(${brightness}%) saturate(${saturation}%)`,
+      boxShadow: overLight ? "0px 16px 70px rgba(0, 0, 0, 0.75)" : "0px 12px 40px rgba(0, 0, 0, 0.25)",
+      cursor: draggable ? (isDragging ? "grabbing" : "grab") : (onClick ? "pointer" : "default"),
       pointerEvents: "auto",
+      transition: "all 0.2s ease-in-out",
       ...(position.centered
         ? {
             position: "fixed",
             top: "50%",
             left: "50%",
-            transform: "translate(-50%, -50%)",
+            transform: transformStyle,
             zIndex: 9999,
           }
         : {
             position: "fixed",
             left: `${position.x}px`,
             top: `${position.y}px`,
-            transform: "none",
+            transform: transformStyle,
             zIndex: 9999,
           }),
       ...style,
@@ -447,7 +734,7 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
           </div>
         )}
 
-        {/* Hidden canvas for displacement map generation */}
+        {/* Hidden canvas for displacement map generation (legacy) */}
         <canvas
           ref={canvasRef}
           style={{ display: "none" }}
@@ -455,41 +742,45 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
           height={Math.floor(glassSize.height * canvasDPI)}
         />
 
-        {/* SVG filter definition */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="0"
-          height="0"
-          className="pointer-events-none fixed top-0 left-0 z-[9998]"
-        >
-          <defs>
-            <filter
-              id={`${id.current}_filter`}
-              filterUnits="userSpaceOnUse"
-              colorInterpolationFilters="sRGB"
-              x="0"
-              y="0"
-              width={glassSize.width.toString()}
-              height={glassSize.height.toString()}
-            >
-              <feImage
-                ref={feImageRef}
-                id={`${id.current}_map`}
-                width={glassSize.width.toString()}
-                height={glassSize.height.toString()}
-              />
-              <feDisplacementMap
-                ref={feDisplacementMapRef}
-                in="SourceGraphic"
-                in2={`${id.current}_map`}
-                xChannelSelector="R"
-                yChannelSelector="G"
-              />
-            </filter>
-          </defs>
-        </svg>
+        {/* Advanced SVG filter with chromatic aberration */}
+        <AdvancedGlassFilter 
+          mode={mode} 
+          id={filterId} 
+          displacementScale={overLight ? displacementScale * 0.5 : displacementScale} 
+          aberrationIntensity={aberrationIntensity} 
+          width={glassSize.width} 
+          height={glassSize.height} 
+          shaderMapUrl={shaderMapUrl} 
+        />
 
-        {/* Liquid glass container with content */}
+        {/* Over light effect layers */}
+        {overLight && (
+          <>
+            <div
+              className="bg-black transition-all duration-150 ease-in-out pointer-events-none"
+              style={{
+                ...containerStyle,
+                opacity: 0.2,
+                boxShadow: "none",
+                backdropFilter: "none",
+                cursor: "default",
+              }}
+            />
+            <div
+              className="bg-black transition-all duration-150 ease-in-out pointer-events-none"
+              style={{
+                ...containerStyle,
+                opacity: 1,
+                mixBlendMode: "overlay",
+                boxShadow: "none",
+                backdropFilter: "none",
+                cursor: "default",
+              }}
+            />
+          </>
+        )}
+
+        {/* Main liquid glass container */}
         <div
           ref={(el) => {
             containerRef.current = el;
@@ -499,15 +790,127 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
               ref.current = el;
             }
           }}
-          className={`${className}`}
+          className={`relative ${className} ${isActive ? "active" : ""} ${Boolean(onClick) ? "cursor-pointer" : ""}`}
           style={containerStyle}
           onMouseDown={handleMouseDown}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onMouseUp={() => setIsActive(false)}
+          onClick={onClick}
           {...props}
         >
-          <div ref={contentRef} style={contentStyle}>
+          {/* Backdrop layer that gets the warp effect */}
+          <span
+            className="absolute inset-0"
+            style={backdropStyle}
+          />
+
+          {/* User content stays sharp */}
+          <div 
+            ref={contentRef} 
+            style={{
+              ...contentStyle,
+              position: "relative",
+              zIndex: 1,
+              color: "white",
+              fontWeight: 500,
+              fontSize: "20px",
+              lineHeight: 1,
+              fontFamily: "system-ui",
+              textShadow: overLight ? "0px 2px 12px rgba(0, 0, 0, 0)" : "0px 2px 12px rgba(0, 0, 0, 0.4)",
+              transition: "all 150ms ease-in-out",
+            }}
+          >
             {children}
           </div>
         </div>
+
+        {/* Enhanced border layers with dynamic gradients */}
+        <span
+          style={{
+            ...containerStyle,
+            pointerEvents: "none",
+            mixBlendMode: "screen",
+            opacity: 0.2,
+            padding: "1.5px",
+            WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
+            background: `linear-gradient(
+              ${135 + (mouseOffset?.x ?? 0) * 1.2}deg,
+              rgba(255, 255, 255, 0.0) 0%,
+              rgba(255, 255, 255, ${0.12 + Math.abs(mouseOffset?.x ?? 0) * 0.008}) ${Math.max(10, 33 + (mouseOffset?.y ?? 0) * 0.3)}%,
+              rgba(255, 255, 255, ${0.4 + Math.abs(mouseOffset?.x ?? 0) * 0.012}) ${Math.min(90, 66 + (mouseOffset?.y ?? 0) * 0.4)}%,
+              rgba(255, 255, 255, 0.0) 100%
+            )`,
+          }}
+        />
+
+        <span
+          style={{
+            ...containerStyle,
+            pointerEvents: "none",
+            mixBlendMode: "overlay",
+            padding: "1.5px",
+            WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
+            background: `linear-gradient(
+              ${135 + (mouseOffset?.x ?? 0) * 1.2}deg,
+              rgba(255, 255, 255, 0.0) 0%,
+              rgba(255, 255, 255, ${0.32 + Math.abs(mouseOffset?.x ?? 0) * 0.008}) ${Math.max(10, 33 + (mouseOffset?.y ?? 0) * 0.3)}%,
+              rgba(255, 255, 255, ${0.6 + Math.abs(mouseOffset?.x ?? 0) * 0.012}) ${Math.min(90, 66 + (mouseOffset?.y ?? 0) * 0.4)}%,
+              rgba(255, 255, 255, 0.0) 100%
+            )`,
+          }}
+        />
+
+        {/* Interactive hover and click effects */}
+        {Boolean(onClick) && (
+          <>
+            <div
+              style={{
+                ...containerStyle,
+                width: glassSize.width + 1,
+                pointerEvents: "none",
+                transition: "all 0.2s ease-out",
+                opacity: isHovered || isActive ? 0.5 : 0,
+                backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%)",
+                mixBlendMode: "overlay",
+                boxShadow: "none",
+                backdropFilter: "none",
+              }}
+            />
+            <div
+              style={{
+                ...containerStyle,
+                width: glassSize.width + 1,
+                pointerEvents: "none",
+                transition: "all 0.2s ease-out",
+                opacity: isActive ? 0.5 : 0,
+                backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 80%)",
+                mixBlendMode: "overlay",
+                boxShadow: "none",
+                backdropFilter: "none",
+              }}
+            />
+            <div
+              style={{
+                ...containerStyle,
+                width: glassSize.width + 1,
+                pointerEvents: "none",
+                transition: "all 0.2s ease-out",
+                opacity: isHovered ? 0.4 : isActive ? 0.8 : 0,
+                backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100%)",
+                mixBlendMode: "overlay",
+                boxShadow: "none",
+                backdropFilter: "none",
+              }}
+            />
+          </>
+        )}
       </>
     );
   },
