@@ -1,3 +1,5 @@
+import { ShaderDisplacementGenerator, fragmentShaders } from "./utils";
+
 export const displacementMap =
   "data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAZABkAAD/2wCEAAQDAwMDAwQDAwQGBAMEBgcFBAQFBwgHBwcHBwgLCAkJCQkICwsMDAwMDAsNDQ4ODQ0SEhISEhQUFBQUFBQUFBQBBQUFCAgIEAsLEBQODg4UFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFP/CABEIAQABAAMBEQACEQEDEQH/xAAxAAEBAQEBAQAAAAAAAAAAAAADAgQIAQYBAQEBAQEBAQAAAAAAAAAAAAMCBAEACAf/2gAMAwEAAhADEAAAAPjPor6kOgOiKhKgKhKgOhKhOhKxKgKhOgKhKhKgKxOhKhOgKhKhKgKwKhKgKgKwG841nns9J/nn2KVCdCdCVAVCVCVAdCVCdiVAVidCVAVCVAdiVCVCdAVCVCVAVCVAVAViVZxsBrPPY6R/NvsY6E6ErEqAqE6ErAqE6E7E7ErA0ErArAqAqEuiVAXRLol0S6J0JUBWBUI0BXnG88djpH81+xjoToSoSoCoTsSoYQTsTsTQSsCsCsCsCsCoC6A0JeAuiXSLwn0SoioCoCoBsBrPFH0j+a/Yx0J0JUJUJ2BUMIR2MIRoBoJIBXnJAK840BUA0BdAegXhL";
 
@@ -12,8 +14,6 @@ export const generateShaderDisplacementMap = (
   width: number,
   height: number,
 ): string => {
-  const { ShaderDisplacementGenerator, fragmentShaders } = require("./utils");
-
   const generator = new ShaderDisplacementGenerator({
     width,
     height,
@@ -38,8 +38,8 @@ export const getMap = (
     case "prominent":
       return prominentDisplacementMap;
     case "shader":
-      return shaderMapUrl || displacementMap;
+      return shaderMapUrl ?? displacementMap;
     default:
-      throw new Error(`Invalid mode: ${mode}`);
+      throw new Error(`Invalid mode: ${String(mode)}`);
   }
 };
