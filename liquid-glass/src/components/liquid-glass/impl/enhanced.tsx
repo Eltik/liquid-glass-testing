@@ -270,7 +270,6 @@ const EnhancedGlassContainer = forwardRef<
       blurAmount = 12,
       saturation = 180,
       aberrationIntensity = 2,
-      mouseOffset = { x: 0, y: 0 },
       onMouseEnter,
       onMouseLeave,
       onMouseDown,
@@ -973,55 +972,6 @@ export default function EnhancedLiquidGlass({
         }}
       />
 
-      {/* Border layer 1 - screen blend */}
-      <span
-        style={{
-          ...containerStyle,
-          pointerEvents: "none",
-          mixBlendMode: "screen",
-          opacity: 0.2,
-          padding: "1.5px",
-          WebkitMask:
-            "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-          WebkitMaskComposite: "xor",
-          maskComposite: "exclude",
-          boxShadow:
-            "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-          background: `linear-gradient(
-            ${135 + mouseOffset.x * 1.2}deg,
-            rgba(255, 255, 255, 0.0) 0%,
-            rgba(255, 255, 255, ${0.12 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
-            rgba(255, 255, 255, ${0.4 + Math.abs(mouseOffset.x) * 0.012}) ${Math.min(90, 66 + mouseOffset.y * 0.4)}%,
-            rgba(255, 255, 255, 0.0) 100%
-          )`,
-          borderRadius: `${cornerRadius}px`,
-        }}
-      />
-
-      {/* Border layer 2 - overlay blend */}
-      <span
-        style={{
-          ...containerStyle,
-          pointerEvents: "none",
-          mixBlendMode: "overlay",
-          padding: "1.5px",
-          WebkitMask:
-            "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-          WebkitMaskComposite: "xor",
-          maskComposite: "exclude",
-          boxShadow:
-            "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-          background: `linear-gradient(
-            ${135 + mouseOffset.x * 1.2}deg,
-            rgba(255, 255, 255, 0.0) 0%,
-            rgba(255, 255, 255, ${0.32 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
-            rgba(255, 255, 255, ${0.6 + Math.abs(mouseOffset.x) * 0.012}) ${Math.min(90, 66 + mouseOffset.y * 0.4)}%,
-            rgba(255, 255, 255, 0.0) 100%
-          )`,
-          borderRadius: `${cornerRadius}px`,
-        }}
-      />
-
       <EnhancedGlassContainer
         ref={(el) => {
           glassRef.current = el;
@@ -1053,6 +1003,57 @@ export default function EnhancedLiquidGlass({
       >
         {children}
       </EnhancedGlassContainer>
+
+      {/* Border layer 1 - screen blend */}
+      <span
+        style={{
+          ...containerStyle,
+          zIndex: (containerStyle.zIndex as number) + 1,
+          pointerEvents: "none",
+          mixBlendMode: "screen",
+          opacity: 0.2,
+          padding: "1.5px",
+          WebkitMask:
+            "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+          boxShadow:
+            "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
+          background: `linear-gradient(
+            ${135 + mouseOffset.x * 1.2}deg,
+            rgba(255, 255, 255, 0.0) 0%,
+            rgba(255, 255, 255, ${0.12 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
+            rgba(255, 255, 255, ${0.4 + Math.abs(mouseOffset.x) * 0.012}) ${Math.min(90, 66 + mouseOffset.y * 0.4)}%,
+            rgba(255, 255, 255, 0.0) 100%
+          )`,
+          borderRadius: `${cornerRadius}px`,
+        }}
+      />
+
+      {/* Border layer 2 - overlay blend */}
+      <span
+        style={{
+          ...containerStyle,
+          zIndex: (containerStyle.zIndex as number) + 2,
+          pointerEvents: "none",
+          mixBlendMode: "overlay",
+          padding: "1.5px",
+          WebkitMask:
+            "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+          boxShadow:
+            "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
+          background: `linear-gradient(
+            ${135 + mouseOffset.x * 1.2}deg,
+            rgba(255, 255, 255, 0.0) 0%,
+            rgba(255, 255, 255, ${0.32 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
+            rgba(255, 255, 255, ${0.6 + Math.abs(mouseOffset.x) * 0.012}) ${Math.min(90, 66 + mouseOffset.y * 0.4)}%,
+            rgba(255, 255, 255, 0.0) 100%
+          )`,
+          borderRadius: `${cornerRadius}px`,
+        }}
+      />
 
       {/* Hover effects */}
       {Boolean(onClick) && (

@@ -2,8 +2,8 @@ import Head from "next/head";
 import { useState } from "react";
 import LiquidGlass from "~/components/liquid-glass";
 import EnhancedLiquidGlass from "~/components/liquid-glass/impl/enhanced";
-import ModeSwitcher from "~/components/liquid-glass/impl/mode-switcher";
-import DisplacementModeControls from "~/components/liquid-glass/impl/displacement-mode-controls";
+import ModeSwitcher from "~/components/mode-switcher";
+import DisplacementModeControls from "~/components/displacement-mode-controls";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("home");
@@ -19,6 +19,8 @@ export default function Home() {
   const [displacementScale, setDisplacementScale] = useState(70);
   const [aberrationIntensity, setAberrationIntensity] = useState(2);
   const [elasticity, setElasticity] = useState(0.15);
+  const [saturation, setSaturation] = useState(140);
+  const [blurAmount, setBlurAmount] = useState(0.0625);
 
   const GlassComponent =
     implementationMode === "enhanced" ? EnhancedLiquidGlass : LiquidGlass;
@@ -39,8 +41,8 @@ export default function Home() {
           mode: displacementMode,
           aberrationIntensity,
           elasticity,
-          blurAmount: 0.0625,
-          saturation: 140,
+          blurAmount,
+          saturation,
         }
       : {};
 
@@ -54,99 +56,50 @@ export default function Home() {
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="relative min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-        {/* Rich background content */}
-        <div className="absolute inset-0 p-8">
-          <div className="grid h-full grid-cols-1 gap-8 pt-20 md:grid-cols-2 lg:grid-cols-3">
-            {/* Sample content cards */}
-            <div className="rounded-xl bg-white/20 p-6 text-white backdrop-blur-sm">
-              <h2 className="mb-4 text-2xl font-bold text-yellow-300">
-                Enhanced Implementation
-              </h2>
-              <p className="text-lg leading-relaxed">
-                The enhanced liquid glass now includes advanced displacement
-                maps, chromatic aberration effects, elastic mouse interactions,
-                and multi-layer visual enhancements from example 2.
-              </p>
-              <div className="mt-4 h-4 rounded-full bg-gradient-to-r from-pink-500 to-violet-500"></div>
-            </div>
-
-            <div className="rounded-xl bg-green-500/30 p-6 text-white backdrop-blur-sm">
-              <h2 className="mb-4 text-2xl font-bold text-green-200">
-                Multiple Displacement Modes
-              </h2>
-              <p className="text-lg leading-relaxed">
-                Switch between Standard, Polar, Prominent, and Shader
-                displacement modes for different visual effects. Each mode
-                creates unique distortion patterns.
-              </p>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <div className="h-8 rounded bg-red-400"></div>
-                <div className="h-8 rounded bg-blue-400"></div>
-                <div className="h-8 rounded bg-yellow-400"></div>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-orange-500/30 p-6 text-white backdrop-blur-sm">
-              <h2 className="mb-4 text-2xl font-bold text-orange-200">
-                Elastic Interactions
-              </h2>
-              <p className="text-lg leading-relaxed">
-                Glass elements now respond elastically to mouse movement,
-                stretching and scaling based on proximity and direction.
-              </p>
-              <div className="mt-4 space-y-2">
-                <div className="h-2 w-full rounded bg-purple-400"></div>
-                <div className="h-2 w-3/4 rounded bg-purple-400"></div>
-                <div className="h-2 w-1/2 rounded bg-purple-400"></div>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-cyan-500/30 p-6 text-white backdrop-blur-sm">
-              <h2 className="mb-4 text-2xl font-bold text-cyan-200">
-                Chromatic Aberration
-              </h2>
-              <p className="text-lg leading-relaxed">
-                Advanced SVG filter chains create realistic chromatic aberration
-                effects at the edges while keeping the center content sharp.
-              </p>
-              <div className="mt-4 flex space-x-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-8 w-8 rounded-full bg-white/40"
-                  ></div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-pink-500/30 p-6 text-white backdrop-blur-sm">
-              <h2 className="mb-4 text-2xl font-bold text-pink-200">
-                Mode Switching
-              </h2>
-              <p className="text-lg leading-relaxed">
-                Toggle between original and enhanced implementations to compare
-                features. All existing drag and resize functionality is
-                preserved.
-              </p>
-              <div className="mt-4">
-                <div className="text-4xl">🔄 ⚙️ 🎯</div>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-violet-500/30 p-6 text-white backdrop-blur-sm">
-              <h2 className="mb-4 text-2xl font-bold text-violet-200">
-                Performance Optimized
-              </h2>
-              <p className="text-lg leading-relaxed">
-                Enhanced implementation maintains responsiveness with optimized
-                displacement map caching and efficient mouse tracking.
-              </p>
-              <div className="mt-4 text-center text-6xl opacity-60">
-                ⚡ 🚀 💫
-              </div>
-            </div>
+      <main className="relative min-h-screen overflow-auto">
+        {/* Background content matching example 2 */}
+        <div className="absolute top-0 left-0 mb-96 min-h-[200vh] w-full pb-96">
+          <img
+            src="https://picsum.photos/2000/2000"
+            className="h-96 w-full object-cover"
+          />
+          <div className="flex flex-col gap-2" id="bright-section">
+            <h2 className="my-5 text-center text-2xl font-semibold">
+              Enhanced Liquid Glass Demo
+            </h2>
+            <p className="px-10 text-center">
+              Experience advanced liquid glass effects with multiple
+              displacement modes, chromatic aberration, and elastic
+              interactions.
+              <br />
+              Drag the glass components around the screen and experiment with
+              different settings using the controls.
+              <br />
+              The enhanced implementation includes all features from example 2
+              while maintaining drag functionality.
+              <br />
+              Switch between Original and Enhanced modes to compare the
+              different implementations.
+              <br />
+              Each displacement mode creates unique visual distortion patterns
+              for varied aesthetic effects.
+              <br />
+              Real-time controls allow fine-tuning of saturation, blur,
+              elasticity, and aberration intensity.
+            </p>
           </div>
+          <img
+            src="https://picsum.photos/1200/1200"
+            className="my-10 h-80 w-full object-cover"
+          />
+          <img
+            src="https://picsum.photos/1400/1300"
+            className="my-10 h-72 w-full object-cover"
+          />
+          <img
+            src="https://picsum.photos/1100/1200"
+            className="my-10 mb-96 h-96 w-full object-cover"
+          />
         </div>
 
         {/* Mode Switcher */}
@@ -166,6 +119,10 @@ export default function Home() {
             onAberrationIntensityChange={setAberrationIntensity}
             elasticity={elasticity}
             onElasticityChange={setElasticity}
+            saturation={saturation}
+            onSaturationChange={setSaturation}
+            blurAmount={blurAmount}
+            onBlurAmountChange={setBlurAmount}
           />
         )}
 

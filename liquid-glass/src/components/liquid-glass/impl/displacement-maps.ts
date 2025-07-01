@@ -202,8 +202,8 @@ const createServerDataUrl = (
 
     // Convert to base64
     let binary = "";
-    for (let i = 0; i < combined.length; i++) {
-      binary += String.fromCharCode(combined[i]!);
+    for (const byte of combined) {
+      binary += String.fromCharCode(byte);
     }
 
     // Use built-in btoa if available (browser), otherwise create manually

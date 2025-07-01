@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 interface ModeSwitcherProps {
   onModeChange: (mode: "original" | "enhanced") => void;
   currentMode: "original" | "enhanced";

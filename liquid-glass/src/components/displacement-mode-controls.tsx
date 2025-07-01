@@ -9,6 +9,10 @@ interface DisplacementModeControlsProps {
   onAberrationIntensityChange: (intensity: number) => void;
   elasticity: number;
   onElasticityChange: (elasticity: number) => void;
+  saturation: number;
+  onSaturationChange: (saturation: number) => void;
+  blurAmount: number;
+  onBlurAmountChange: (blurAmount: number) => void;
 }
 
 export default function DisplacementModeControls({
@@ -20,6 +24,10 @@ export default function DisplacementModeControls({
   onAberrationIntensityChange,
   elasticity,
   onElasticityChange,
+  saturation,
+  onSaturationChange,
+  blurAmount,
+  onBlurAmountChange,
 }: DisplacementModeControlsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -117,6 +125,38 @@ export default function DisplacementModeControls({
               step="0.05"
               value={elasticity}
               onChange={(e) => onElasticityChange(parseFloat(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+            />
+          </div>
+
+          {/* Saturation */}
+          <div>
+            <label className="mb-1 block text-xs font-medium">
+              Saturation: {saturation}%
+            </label>
+            <input
+              type="range"
+              min="50"
+              max="300"
+              step="10"
+              value={saturation}
+              onChange={(e) => onSaturationChange(parseInt(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+            />
+          </div>
+
+          {/* Blur Amount */}
+          <div>
+            <label className="mb-1 block text-xs font-medium">
+              Blur Amount: {blurAmount.toFixed(4)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="0.5"
+              step="0.0125"
+              value={blurAmount}
+              onChange={(e) => onBlurAmountChange(parseFloat(e.target.value))}
               className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
             />
           </div>
