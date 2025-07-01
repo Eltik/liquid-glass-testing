@@ -1,18 +1,56 @@
 import Head from "next/head";
 import { useState } from "react";
 import LiquidGlass from "~/components/liquid-glass";
+import EnhancedLiquidGlass from "~/components/liquid-glass/impl/enhanced";
+import ModeSwitcher from "~/components/liquid-glass/impl/mode-switcher";
+import DisplacementModeControls from "~/components/liquid-glass/impl/displacement-mode-controls";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("home");
   const [cardSize, setCardSize] = useState({ width: 320, height: 240 });
+  const [implementationMode, setImplementationMode] = useState<
+    "original" | "enhanced"
+  >("enhanced");
+
+  // Enhanced mode controls
+  const [displacementMode, setDisplacementMode] = useState<
+    "standard" | "polar" | "prominent" | "shader"
+  >("standard");
+  const [displacementScale, setDisplacementScale] = useState(70);
+  const [aberrationIntensity, setAberrationIntensity] = useState(2);
+  const [elasticity, setElasticity] = useState(0.15);
+
+  const GlassComponent =
+    implementationMode === "enhanced" ? EnhancedLiquidGlass : LiquidGlass;
+
+  // Common props for both implementations
+  const commonProps = {
+    padding: "16px 32px",
+    cornerRadius: 16,
+    displacementScale:
+      implementationMode === "enhanced" ? displacementScale : 30,
+    className: "shadow-lg",
+  };
+
+  // Enhanced-specific props
+  const enhancedProps =
+    implementationMode === "enhanced"
+      ? {
+          mode: displacementMode,
+          aberrationIntensity,
+          elasticity,
+          blurAmount: 0.0625,
+          saturation: 140,
+        }
+      : {};
 
   return (
     <>
       <Head>
-        <title>Responsive Liquid Glass Demo</title>
+        <title>Enhanced Liquid Glass Demo</title>
         <meta
           name="description"
-          content="Responsive liquid glass wrapper component with sticky navbar examples"
+          content="Enhanced liquid glass with advanced displacement modes, chromatic aberration, and elastic interactions"
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -23,23 +61,24 @@ export default function Home() {
             {/* Sample content cards */}
             <div className="rounded-xl bg-white/20 p-6 text-white backdrop-blur-sm">
               <h2 className="mb-4 text-2xl font-bold text-yellow-300">
-                Responsive Design
+                Enhanced Implementation
               </h2>
               <p className="text-lg leading-relaxed">
-                The liquid glass component now automatically adapts to its
-                content size, making it perfect for responsive designs and
-                dynamic content.
+                The enhanced liquid glass now includes advanced displacement
+                maps, chromatic aberration effects, elastic mouse interactions,
+                and multi-layer visual enhancements from example 2.
               </p>
               <div className="mt-4 h-4 rounded-full bg-gradient-to-r from-pink-500 to-violet-500"></div>
             </div>
 
             <div className="rounded-xl bg-green-500/30 p-6 text-white backdrop-blur-sm">
               <h2 className="mb-4 text-2xl font-bold text-green-200">
-                Wrapper Component
+                Multiple Displacement Modes
               </h2>
               <p className="text-lg leading-relaxed">
-                You can now place any content inside the liquid glass effect -
-                navigation bars, buttons, cards, or any other components.
+                Switch between Standard, Polar, Prominent, and Shader
+                displacement modes for different visual effects. Each mode
+                creates unique distortion patterns.
               </p>
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <div className="h-8 rounded bg-red-400"></div>
@@ -50,11 +89,11 @@ export default function Home() {
 
             <div className="rounded-xl bg-orange-500/30 p-6 text-white backdrop-blur-sm">
               <h2 className="mb-4 text-2xl font-bold text-orange-200">
-                Sticky Navigation
+                Elastic Interactions
               </h2>
               <p className="text-lg leading-relaxed">
-                The examples above show how liquid glass can be used for modern
-                sticky navigation bars that distort the background content.
+                Glass elements now respond elastically to mouse movement,
+                stretching and scaling based on proximity and direction.
               </p>
               <div className="mt-4 space-y-2">
                 <div className="h-2 w-full rounded bg-purple-400"></div>
@@ -65,12 +104,11 @@ export default function Home() {
 
             <div className="rounded-xl bg-cyan-500/30 p-6 text-white backdrop-blur-sm">
               <h2 className="mb-4 text-2xl font-bold text-cyan-200">
-                Interactive Elements
+                Chromatic Aberration
               </h2>
               <p className="text-lg leading-relaxed">
-                The glass elements are fully interactive - click navigation
-                items, hover over buttons, and drag the elements around the
-                screen.
+                Advanced SVG filter chains create realistic chromatic aberration
+                effects at the edges while keeping the center content sharp.
               </p>
               <div className="mt-4 flex space-x-2">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -84,55 +122,80 @@ export default function Home() {
 
             <div className="rounded-xl bg-pink-500/30 p-6 text-white backdrop-blur-sm">
               <h2 className="mb-4 text-2xl font-bold text-pink-200">
-                Flexible Styling
+                Mode Switching
               </h2>
               <p className="text-lg leading-relaxed">
-                Customize corner radius, padding, displacement intensity, and
-                visual effects to match your design system perfectly.
+                Toggle between original and enhanced implementations to compare
+                features. All existing drag and resize functionality is
+                preserved.
               </p>
               <div className="mt-4">
-                <div className="text-4xl">🎨 ⚙️ 🎯</div>
+                <div className="text-4xl">🔄 ⚙️ 🎯</div>
               </div>
             </div>
 
             <div className="rounded-xl bg-violet-500/30 p-6 text-white backdrop-blur-sm">
               <h2 className="mb-4 text-2xl font-bold text-violet-200">
-                Modern UI
+                Performance Optimized
               </h2>
               <p className="text-lg leading-relaxed">
-                Perfect for creating cutting-edge user interfaces with stunning
-                visual effects that enhance user engagement and experience.
+                Enhanced implementation maintains responsiveness with optimized
+                displacement map caching and efficient mouse tracking.
               </p>
               <div className="mt-4 text-center text-6xl opacity-60">
-                ✨ 🚀 💫
+                ⚡ 🚀 💫
               </div>
             </div>
           </div>
         </div>
 
+        {/* Mode Switcher */}
+        <ModeSwitcher
+          currentMode={implementationMode}
+          onModeChange={setImplementationMode}
+        />
+
+        {/* Enhanced Controls (only show when enhanced mode is active) */}
+        {implementationMode === "enhanced" && (
+          <DisplacementModeControls
+            mode={displacementMode}
+            onModeChange={setDisplacementMode}
+            displacementScale={displacementScale}
+            onDisplacementScaleChange={setDisplacementScale}
+            aberrationIntensity={aberrationIntensity}
+            onAberrationIntensityChange={setAberrationIntensity}
+            elasticity={elasticity}
+            onElasticityChange={setElasticity}
+          />
+        )}
+
         {/* Instructions overlay */}
         <div className="absolute top-4 right-4 left-4 z-[10000]">
           <div className="rounded-lg bg-black/50 p-4 text-center text-white backdrop-blur-sm">
             <h1 className="mb-2 text-2xl font-bold">
-              Responsive Liquid Glass Wrapper Demo
+              Enhanced Liquid Glass Demo (
+              {implementationMode === "enhanced" ? "Enhanced" : "Original"}{" "}
+              Mode)
             </h1>
             <p className="text-sm opacity-90">
-              Interactive navbar examples • Drag elements around • Compare
-              frosted vs original glass styles • Fully responsive
+              {implementationMode === "enhanced"
+                ? "Advanced displacement modes • Chromatic aberration • Elastic interactions • Dynamic borders"
+                : "Basic glass effect • Drag elements around • Resize functionality • Clean simple look"}
             </p>
           </div>
         </div>
 
-        {/* Sticky Navigation Bar - Top */}
-        <LiquidGlass
-          padding="16px 32px"
-          cornerRadius={16}
+        {/* Showcase Examples */}
+
+        {/* Standard Mode Example */}
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
+          mode={implementationMode === "enhanced" ? "standard" : undefined}
           initialPosition={{ x: 50, y: 100 }}
-          displacementScale={30}
-          className="shadow-lg"
         >
           <nav className="flex items-center space-x-6 text-white">
-            <div className="text-lg font-bold">Logo</div>
+            <div className="text-lg font-bold">Standard Glass</div>
             <div className="flex space-x-4">
               {["Home", "About", "Services", "Contact"].map((item) => (
                 <button
@@ -149,15 +212,69 @@ export default function Home() {
               ))}
             </div>
           </nav>
-        </LiquidGlass>
+        </GlassComponent>
+
+        {/* Polar Mode Example (Enhanced only) */}
+        {implementationMode === "enhanced" && (
+          <EnhancedLiquidGlass
+            {...commonProps}
+            {...enhancedProps}
+            mode="polar"
+            initialPosition={{ x: 1200, y: 150 }}
+            cornerRadius={20}
+          >
+            <div className="text-center text-white">
+              <div className="mb-2 text-3xl">🌀</div>
+              <h3 className="mb-1 text-base font-bold">Polar Mode</h3>
+              <p className="text-xs opacity-80">Radial swirl distortion</p>
+            </div>
+          </EnhancedLiquidGlass>
+        )}
+
+        {/* Prominent Mode Example (Enhanced only) */}
+        {implementationMode === "enhanced" && (
+          <EnhancedLiquidGlass
+            {...commonProps}
+            {...enhancedProps}
+            mode="prominent"
+            initialPosition={{ x: 800, y: 250 }}
+            cornerRadius={16}
+            displacementScale={90}
+          >
+            <div className="text-center text-white">
+              <div className="mb-2 text-3xl">〰️</div>
+              <h3 className="mb-1 text-base font-bold">Prominent Mode</h3>
+              <p className="text-xs opacity-80">Wave interference patterns</p>
+            </div>
+          </EnhancedLiquidGlass>
+        )}
+
+        {/* Shader Mode Example (Enhanced only) */}
+        {implementationMode === "enhanced" && (
+          <EnhancedLiquidGlass
+            {...commonProps}
+            {...enhancedProps}
+            mode="shader"
+            initialPosition={{ x: 600, y: 350 }}
+            cornerRadius={12}
+            aberrationIntensity={4}
+          >
+            <div className="text-center text-white">
+              <div className="mb-2 text-3xl">✨</div>
+              <h3 className="mb-1 text-base font-bold">Shader Mode</h3>
+              <p className="text-xs opacity-80">WebGL-generated patterns</p>
+            </div>
+          </EnhancedLiquidGlass>
+        )}
 
         {/* Compact Navigation - Side */}
-        <LiquidGlass
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
           padding="20px"
           cornerRadius={12}
-          initialPosition={{ x: 1200, y: 200 }}
-          displacementScale={25}
-          className="shadow-lg"
+          initialPosition={{ x: 1200, y: 350 }}
+          displacementScale={implementationMode === "enhanced" ? 45 : 25}
         >
           <div className="flex flex-col space-y-3 text-center text-white">
             <div className="text-sm font-semibold text-blue-200">Quick Nav</div>
@@ -170,15 +287,19 @@ export default function Home() {
               </button>
             ))}
           </div>
-        </LiquidGlass>
+        </GlassComponent>
 
-        {/* Action Bar - Bottom Style */}
-        <LiquidGlass
+        {/* Action Bar with Enhanced Effects */}
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
           padding="16px 24px"
           cornerRadius={20}
-          initialPosition={{ x: 100, y: 600 }}
-          displacementScale={35}
-          className="shadow-xl"
+          initialPosition={{ x: 100, y: 500 }}
+          displacementScale={implementationMode === "enhanced" ? 80 : 35}
+          aberrationIntensity={
+            implementationMode === "enhanced" ? 3 : undefined
+          }
         >
           <div className="flex items-center space-x-4 text-white">
             <button className="rounded-lg bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 font-semibold transition-all hover:from-pink-600 hover:to-violet-600">
@@ -189,22 +310,23 @@ export default function Home() {
             </button>
             <div className="text-2xl">🎉</div>
           </div>
-        </LiquidGlass>
+        </GlassComponent>
 
         {/* Auto-sizing Card Example */}
-        <LiquidGlass
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
           padding="24px"
           cornerRadius={16}
-          initialPosition={{ x: 1000, y: 350 }}
-          displacementScale={20}
-          blurAmount={0.5}
-          className="shadow-lg"
+          initialPosition={{ x: 1000, y: 450 }}
+          displacementScale={implementationMode === "enhanced" ? 50 : 20}
+          blurAmount={implementationMode === "enhanced" ? 0.1 : 0.5}
         >
           <div className="text-center text-white">
             <div className="mb-3 text-3xl">📱</div>
             <h3 className="mb-2 text-lg font-bold">Auto-Sizing</h3>
             <p className="max-w-xs text-sm leading-relaxed opacity-90">
-              This component automatically adjusts to its content size!
+              Component automatically adjusts to content size in both modes!
             </p>
             <div className="mt-4 flex justify-center space-x-2">
               <div className="h-2 w-2 rounded-full bg-green-400"></div>
@@ -212,31 +334,17 @@ export default function Home() {
               <div className="h-2 w-2 rounded-full bg-red-400"></div>
             </div>
           </div>
-        </LiquidGlass>
+        </GlassComponent>
 
-        {/* Floating Action Menu */}
-        <LiquidGlass
-          padding="16px"
-          cornerRadius={24}
-          initialPosition={{ x: 50, y: 500 }}
-          displacementScale={28}
-          className="shadow-lg"
-        >
-          <div className="flex items-center space-x-3 text-white">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-green-400 to-blue-500 text-sm font-bold">
-              +
-            </div>
-            <div className="text-sm font-medium">Add New Item</div>
-          </div>
-        </LiquidGlass>
-
-        {/* User Profile Card */}
-        <LiquidGlass
+        {/* User Profile Card with Elastic Effects */}
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
           padding="20px"
           cornerRadius={12}
-          initialPosition={{ x: 600, y: 250 }}
-          displacementScale={22}
-          className="shadow-lg"
+          initialPosition={{ x: 400, y: 200 }}
+          displacementScale={implementationMode === "enhanced" ? 60 : 22}
+          elasticity={implementationMode === "enhanced" ? 0.25 : undefined}
         >
           <div className="flex items-center space-x-3 text-white">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-purple-400 to-pink-400 text-sm font-bold">
@@ -248,147 +356,35 @@ export default function Home() {
             </div>
             <div className="text-green-400">●</div>
           </div>
-        </LiquidGlass>
+        </GlassComponent>
 
-        {/* Minimal Button Example */}
-        <LiquidGlass
-          padding="12px 20px"
-          cornerRadius={8}
-          initialPosition={{ x: 300, y: 400 }}
-          displacementScale={15}
-          className="shadow-lg"
+        {/* Floating Action Menu */}
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
+          padding="16px"
+          cornerRadius={24}
+          initialPosition={{ x: 50, y: 350 }}
+          displacementScale={implementationMode === "enhanced" ? 55 : 28}
         >
-          <button className="font-medium text-white">Click Me</button>
-        </LiquidGlass>
-
-        {/* Text Badge Example */}
-        <LiquidGlass
-          padding="8px 16px"
-          cornerRadius={20}
-          initialPosition={{ x: 800, y: 150 }}
-          displacementScale={18}
-          className="shadow-lg"
-        >
-          <span className="text-sm font-semibold text-white">
-            New Feature 🎉
-          </span>
-        </LiquidGlass>
-
-        {/* Original Example 3 Style - Simple Glass */}
-        <LiquidGlass
-          padding="16px 24px"
-          cornerRadius={12}
-          initialPosition={{ x: 950, y: 450 }}
-          displacementScale={30}
-          frosted={false}
-          className="shadow-lg"
-        >
-          <div className="text-center text-white">
-            <div className="mb-2 text-2xl">🪟</div>
-            <h3 className="mb-1 text-sm font-bold">Original Glass</h3>
-            <p className="text-xs opacity-80">Simple, clean look</p>
-          </div>
-        </LiquidGlass>
-
-        {/* Frosted Glass Comparison */}
-        <LiquidGlass
-          padding="16px 24px"
-          cornerRadius={12}
-          initialPosition={{ x: 750, y: 450 }}
-          displacementScale={30}
-          frosted={true}
-          mode="standard"
-          aberrationIntensity={3}
-          className="shadow-lg"
-        >
-          <div className="text-center text-white">
-            <div className="mb-2 text-2xl">✨</div>
-            <h3 className="mb-1 text-sm font-bold">Frosted Glass</h3>
-            <p className="text-xs opacity-80">Advanced effects</p>
-          </div>
-        </LiquidGlass>
-
-        {/* Simple Glass Navigation - Example 3 Style */}
-        <LiquidGlass
-          padding="12px 20px"
-          cornerRadius={8}
-          initialPosition={{ x: 300, y: 150 }}
-          displacementScale={25}
-          frosted={false}
-          className="shadow-lg"
-        >
-          <nav className="flex items-center space-x-4 text-white">
-            <div className="text-base font-bold">Simple</div>
-            <div className="flex space-x-3">
-              {["Home", "About"].map((item) => (
-                <button
-                  key={item}
-                  className="rounded px-2 py-1 text-sm transition-all hover:bg-white/20"
-                >
-                  {item}
-                </button>
-              ))}
+          <div className="flex items-center space-x-3 text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-green-400 to-blue-500 text-sm font-bold">
+              +
             </div>
-          </nav>
-        </LiquidGlass>
-
-        {/* Polar Mode Example */}
-        <LiquidGlass
-          padding="20px"
-          cornerRadius={16}
-          initialPosition={{ x: 1100, y: 300 }}
-          displacementScale={40}
-          frosted={true}
-          mode="polar"
-          aberrationIntensity={4}
-          className="shadow-lg"
-        >
-          <div className="text-center text-white">
-            <div className="mb-2 text-3xl">🌀</div>
-            <h3 className="mb-1 text-base font-bold">Polar Mode</h3>
-            <p className="text-xs opacity-80">Radial distortion</p>
+            <div className="text-sm font-medium">Add New Item</div>
           </div>
-        </LiquidGlass>
-
-        {/* Large Content Example */}
-        <LiquidGlass
-          padding="32px"
-          cornerRadius={16}
-          initialPosition={{ x: 400, y: 500 }}
-          displacementScale={30}
-          className="shadow-lg"
-        >
-          <div className="max-w-md text-white">
-            <h2 className="mb-4 text-xl font-bold">Dynamic Sizing Demo</h2>
-            <p className="mb-4 text-sm leading-relaxed opacity-90">
-              This is a larger content area that demonstrates how the liquid
-              glass wrapper automatically adjusts to accommodate different
-              content sizes. The glass effect scales perfectly to match the
-              content dimensions.
-            </p>
-            <div className="flex space-x-2">
-              <div className="rounded bg-blue-500/50 px-3 py-1 text-xs">
-                Tag 1
-              </div>
-              <div className="rounded bg-green-500/50 px-3 py-1 text-xs">
-                Tag 2
-              </div>
-              <div className="rounded bg-purple-500/50 px-3 py-1 text-xs">
-                Tag 3
-              </div>
-            </div>
-          </div>
-        </LiquidGlass>
+        </GlassComponent>
 
         {/* Resizable Card Example */}
-        <LiquidGlass
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
           width={cardSize.width}
           height={cardSize.height}
           padding="24px"
           cornerRadius={12}
-          initialPosition={{ x: 150, y: 350 }}
-          displacementScale={25}
-          className="shadow-xl"
+          initialPosition={{ x: 300, y: 400 }}
+          displacementScale={implementationMode === "enhanced" ? 60 : 25}
         >
           <div className="flex h-full w-full flex-col text-white">
             <div className="mb-4 flex items-center justify-between">
@@ -399,7 +395,7 @@ export default function Home() {
             <div className="flex flex-1 flex-col justify-center space-y-3">
               <p className="text-sm leading-relaxed opacity-90">
                 Use the controls below to resize this liquid glass card
-                dynamically!
+                dynamically in both modes!
               </p>
 
               <div className="space-y-2">
@@ -448,7 +444,43 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </LiquidGlass>
+        </GlassComponent>
+
+        {/* Large Content Example with Enhanced Effects */}
+        <GlassComponent
+          {...commonProps}
+          {...enhancedProps}
+          padding="32px"
+          cornerRadius={16}
+          initialPosition={{ x: 700, y: 500 }}
+          displacementScale={implementationMode === "enhanced" ? 75 : 30}
+          aberrationIntensity={
+            implementationMode === "enhanced" ? 1.5 : undefined
+          }
+        >
+          <div className="max-w-md text-white">
+            <h2 className="mb-4 text-xl font-bold">
+              {implementationMode === "enhanced" ? "Enhanced" : "Original"}{" "}
+              Implementation
+            </h2>
+            <p className="mb-4 text-sm leading-relaxed opacity-90">
+              {implementationMode === "enhanced"
+                ? "This enhanced implementation includes all advanced features from example 2: multiple displacement modes, chromatic aberration, elastic interactions, and dynamic visual effects while preserving all original functionality."
+                : "This original implementation provides the core liquid glass effect with drag and resize functionality, clean performance, and reliable cross-browser compatibility."}
+            </p>
+            <div className="flex space-x-2">
+              <div className="rounded bg-blue-500/50 px-3 py-1 text-xs">
+                {implementationMode === "enhanced" ? "Advanced" : "Original"}
+              </div>
+              <div className="rounded bg-green-500/50 px-3 py-1 text-xs">
+                Draggable
+              </div>
+              <div className="rounded bg-purple-500/50 px-3 py-1 text-xs">
+                Resizable
+              </div>
+            </div>
+          </div>
+        </GlassComponent>
       </main>
     </>
   );

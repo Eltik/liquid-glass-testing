@@ -1,6 +1,6 @@
 import { type CSSProperties, forwardRef, useCallback, useEffect, useId, useRef, useState } from "react"
 import { ShaderDisplacementGenerator, fragmentShaders } from "./shader-utils"
-import { displacementMap, polarDisplacementMap, prominentDisplacementMap } from "./utils"
+import { getDisplacementMap, getPolarDisplacementMap, getProminentDisplacementMap } from "./utils"
 
 // Generate shader-based displacement map using shaderUtils
 const generateShaderDisplacementMap = (width: number, height: number): string => {
@@ -19,13 +19,13 @@ const generateShaderDisplacementMap = (width: number, height: number): string =>
 const getMap = (mode: "standard" | "polar" | "prominent" | "shader", shaderMapUrl?: string) => {
   switch (mode) {
     case "standard":
-      return displacementMap
+      return getDisplacementMap()
     case "polar":
-      return polarDisplacementMap
+      return getPolarDisplacementMap()
     case "prominent":
-      return prominentDisplacementMap
+      return getProminentDisplacementMap()
     case "shader":
-      return shaderMapUrl || displacementMap
+      return shaderMapUrl || getDisplacementMap()
     default:
       throw new Error(`Invalid mode: ${mode}`)
   }

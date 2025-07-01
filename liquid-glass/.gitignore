@@ -44,3 +44,7 @@ yarn-error.log*
 
 # idea files
 .idea
+bun.lock
+.claude
+CLAUDE.md
+package-lock.json

@@ -1,4 +1,4 @@
-import { utils } from "./utils";
+// Enhanced shader utilities for WebGL-based displacement map generation
 
 export interface Vec2 {
   x: number;
@@ -12,17 +12,74 @@ export interface ShaderOptions {
   mousePosition?: Vec2;
 }
 
-// Fragment shader functions for different effects
+function smoothStep(a: number, b: number, t: number): number {
+  t = Math.max(0, Math.min(1, (t - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+function length(x: number, y: number): number {
+  return Math.sqrt(x * x + y * y);
+}
+
+function roundedRectSDF(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): number {
+  const qx = Math.abs(x) - width + radius;
+  const qy = Math.abs(y) - height + radius;
+  return (
+    Math.min(Math.max(qx, qy), 0) +
+    length(Math.max(qx, 0), Math.max(qy, 0)) -
+    radius
+  );
+}
+
+function texture(x: number, y: number): Vec2 {
+  return { x, y };
+}
+
+// Shader fragment functions for different effects
 export const fragmentShaders = {
   liquidGlass: (uv: Vec2): Vec2 => {
     const ix = uv.x - 0.5;
     const iy = uv.y - 0.5;
-    const distanceToEdge = utils.roundedRectSDF(ix, iy, 0.3, 0.2, 0.6);
-    const displacement = utils.smoothStep(0.8, 0, distanceToEdge - 0.15);
-    const scaled = utils.smoothStep(0, 1, displacement);
-    return { x: ix * scaled + 0.5, y: iy * scaled + 0.5 };
+    const distanceToEdge = roundedRectSDF(ix, iy, 0.3, 0.2, 0.6);
+    const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
+    const scaled = smoothStep(0, 1, displacement);
+    return texture(ix * scaled + 0.5, iy * scaled + 0.5);
+  },
+
+  ripple: (uv: Vec2, mouse?: Vec2): Vec2 => {
+    const mouseX = mouse?.x ?? 0.5;
+    const mouseY = mouse?.y ?? 0.5;
+    const distToMouse = length(uv.x - mouseX, uv.y - mouseY);
+    const rippleStrength =
+      Math.sin(distToMouse * 20 - Date.now() * 0.01) * 0.02;
+    const falloff = Math.exp(-distToMouse * 5);
+    return texture(
+      uv.x + rippleStrength * falloff,
+      uv.y + rippleStrength * falloff,
+    );
+  },
+
+  vortex: (uv: Vec2): Vec2 => {
+    const centerX = uv.x - 0.5;
+    const centerY = uv.y - 0.5;
+    const angle = Math.atan2(centerY, centerX);
+    const radius = length(centerX, centerY);
+    const vortexStrength = Math.exp(-radius * 4) * 0.3;
+    const newAngle = angle + vortexStrength;
+    return texture(
+      Math.cos(newAngle) * radius + 0.5,
+      Math.sin(newAngle) * radius + 0.5,
+    );
   },
 };
+
+export type FragmentShaderType = keyof typeof fragmentShaders;
 
 export class ShaderDisplacementGenerator {
   private canvas: HTMLCanvasElement;
@@ -111,3 +168,5 @@ export class ShaderDisplacementGenerator {
     return this.canvasDPI;
   }
 }
+
+export { smoothStep, length, roundedRectSDF, texture };

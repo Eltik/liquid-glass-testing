@@ -23,8 +23,13 @@ function roundedRectSDF(
   );
 }
 
-function texture(x: number, y: number) {
-  return { type: "t", x, y };
+export interface Vec2 {
+  x: number;
+  y: number;
+}
+
+function texture(x: number, y: number): Vec2 {
+  return { x, y };
 }
 
 function generateId() {
