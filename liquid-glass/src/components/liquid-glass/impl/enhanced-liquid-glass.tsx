@@ -621,15 +621,12 @@ export default function EnhancedLiquidGlass({
     };
   }, [globalMousePos, elasticity, calculateFadeInFactor]);
 
+  const elasticTranslation = isDragging ? { x: 0, y: 0 } : calculateElasticTranslation();
+  const directionalScale = isDragging ? "scale(1)" : (isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale());
+  
   const transformStyle = position.centered
-    ? `translate3d(calc(-50% + ${calculateElasticTranslation().x}px), calc(-50% + ${calculateElasticTranslation().y}px), 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`
-    : `translate3d(${calculateElasticTranslation().x}px, ${calculateElasticTranslation().y}px, 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`;
-
-  const baseStyle = {
-    ...style,
-    transform: transformStyle,
-    transition: "all ease-out 0.2s",
-  };
+    ? `translate3d(calc(-50% + ${elasticTranslation.x}px), calc(-50% + ${elasticTranslation.y}px), 0) ${directionalScale}`
+    : `translate3d(${elasticTranslation.x}px, ${elasticTranslation.y}px, 0) ${directionalScale}`;
 
   const borderPositionStyles: React.CSSProperties = position.centered
     ? {
@@ -643,7 +640,7 @@ export default function EnhancedLiquidGlass({
         position: "fixed",
         transform: isDragging
           ? `translate3d(${position.x}px, ${position.y}px, 0)`
-          : `translate3d(${position.x + calculateElasticTranslation().x}px, ${position.y + calculateElasticTranslation().y}px, 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`,
+          : `translate3d(${position.x + elasticTranslation.x}px, ${position.y + elasticTranslation.y}px, 0) ${directionalScale}`,
         zIndex: 10000,
       };
 
@@ -667,7 +664,7 @@ export default function EnhancedLiquidGlass({
           position: "fixed",
           transform: isDragging
             ? `translate3d(${position.x}px, ${position.y}px, 0)`
-            : `translate3d(${position.x + calculateElasticTranslation().x}px, ${position.y + calculateElasticTranslation().y}px, 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`,
+            : `translate3d(${position.x + elasticTranslation.x}px, ${position.y + elasticTranslation.y}px, 0) ${directionalScale}`,
           zIndex: 9999,
         }),
   };
@@ -683,28 +680,28 @@ export default function EnhancedLiquidGlass({
 
       {/* Over light effect */}
       <div
-        className={`pointer-events-none bg-black transition-all duration-150 ease-in-out ${overLight ? "opacity-20" : "opacity-0"}`}
+        className={`pointer-events-none bg-black ${overLight ? "opacity-20" : "opacity-0"}`}
         style={{
           ...borderPositionStyles,
           height: glassSize.height,
           width: glassSize.width,
           borderRadius: `${cornerRadius}px`,
           pointerEvents: "none",
-          transition: baseStyle.transition,
+          transition: isDragging ? "none" : "all 0.15s ease-in-out",
           overflow: "hidden",
           clipPath: `inset(0 round ${cornerRadius}px)`,
           WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
         }}
       />
       <div
-        className={`pointer-events-none bg-black mix-blend-overlay transition-all duration-150 ease-in-out ${overLight ? "opacity-100" : "opacity-0"}`}
+        className={`pointer-events-none bg-black mix-blend-overlay ${overLight ? "opacity-100" : "opacity-0"}`}
         style={{
           ...borderPositionStyles,
           height: glassSize.height,
           width: glassSize.width,
           borderRadius: `${cornerRadius}px`,
           pointerEvents: "none",
-          transition: baseStyle.transition,
+          transition: isDragging ? "none" : "all 0.15s ease-in-out",
           overflow: "hidden",
           clipPath: `inset(0 round ${cornerRadius}px)`,
           WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
@@ -752,13 +749,14 @@ export default function EnhancedLiquidGlass({
           mixBlendMode: "screen",
           opacity: 0.2,
           padding: "1.5px",
+          transition: isDragging ? "none" : "all ease-out 0.2s",
           WebkitMask:
             "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
           WebkitMaskComposite: "xor",
           maskComposite: "exclude",
           boxShadow:
             "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-          background: `linear-gradient(
+          background: isDragging ? "linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.4) 66%, rgba(255, 255, 255, 0.0) 100%)" : `linear-gradient(
             ${135 + mouseOffset.x * 1.2}deg,
             rgba(255, 255, 255, 0.0) 0%,
             rgba(255, 255, 255, ${0.12 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
@@ -780,13 +778,14 @@ export default function EnhancedLiquidGlass({
           pointerEvents: "none",
           mixBlendMode: "overlay",
           padding: "1.5px",
+          transition: isDragging ? "none" : "all ease-out 0.2s",
           WebkitMask:
             "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
           WebkitMaskComposite: "xor",
           maskComposite: "exclude",
           boxShadow:
             "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-          background: `linear-gradient(
+          background: isDragging ? "linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.32) 33%, rgba(255, 255, 255, 0.6) 66%, rgba(255, 255, 255, 0.0) 100%)" : `linear-gradient(
             ${135 + mouseOffset.x * 1.2}deg,
             rgba(255, 255, 255, 0.0) 0%,
             rgba(255, 255, 255, ${0.32 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
@@ -810,7 +809,7 @@ export default function EnhancedLiquidGlass({
               width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
-              transition: "all 0.2s ease-out",
+              transition: isDragging ? "none" : "all 0.2s ease-out",
               opacity: isHovered || isActive ? 0.5 : 0,
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%)",
@@ -827,7 +826,7 @@ export default function EnhancedLiquidGlass({
               width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
-              transition: "all 0.2s ease-out",
+              transition: isDragging ? "none" : "all 0.2s ease-out",
               opacity: isActive ? 0.5 : 0,
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 80%)",
@@ -844,7 +843,7 @@ export default function EnhancedLiquidGlass({
               width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
-              transition: "all 0.2s ease-out",
+              transition: isDragging ? "none" : "all 0.2s ease-out",
               opacity: isHovered ? 0.4 : isActive ? 0.8 : 0,
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100%)",
