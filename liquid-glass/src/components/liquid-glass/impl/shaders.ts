@@ -1,9 +1,5 @@
 // Enhanced shader utilities for WebGL-based displacement map generation
-
-export interface Vec2 {
-  x: number;
-  y: number;
-}
+import { utils, type Vec2 } from "./utils";
 
 export interface ShaderOptions {
   width: number;
@@ -12,34 +8,8 @@ export interface ShaderOptions {
   mousePosition?: Vec2;
 }
 
-function smoothStep(a: number, b: number, t: number): number {
-  t = Math.max(0, Math.min(1, (t - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-}
-
-function length(x: number, y: number): number {
-  return Math.sqrt(x * x + y * y);
-}
-
-function roundedRectSDF(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-): number {
-  const qx = Math.abs(x) - width + radius;
-  const qy = Math.abs(y) - height + radius;
-  return (
-    Math.min(Math.max(qx, qy), 0) +
-    length(Math.max(qx, 0), Math.max(qy, 0)) -
-    radius
-  );
-}
-
-function texture(x: number, y: number): Vec2 {
-  return { x, y };
-}
+// Re-export for convenience
+const { smoothStep, length, roundedRectSDF, texture } = utils;
 
 // Shader fragment functions for different effects
 export const fragmentShaders = {
@@ -169,4 +139,6 @@ export class ShaderDisplacementGenerator {
   }
 }
 
-export { smoothStep, length, roundedRectSDF, texture };
+// Re-export utilities for backward compatibility
+export { utils as mathUtils } from "./utils";
+export type { Vec2 } from "./utils";

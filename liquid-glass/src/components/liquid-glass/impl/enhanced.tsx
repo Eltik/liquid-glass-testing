@@ -13,6 +13,7 @@ import {
   getPolarDisplacementMap,
   getProminentDisplacementMap,
 } from "./displacement-maps";
+import { useGlassBehavior } from "./use-glass-behavior";
 
 // Generate shader-based displacement map using shaderUtils
 const generateShaderDisplacementMap = (
@@ -58,6 +59,7 @@ const GlassFilter: React.FC<{
   height: number;
   mode: "standard" | "polar" | "prominent" | "shader";
   shaderMapUrl?: string;
+  cornerRadius?: number;
 }> = ({
   id,
   displacementScale,
@@ -66,6 +68,7 @@ const GlassFilter: React.FC<{
   height,
   mode,
   shaderMapUrl,
+  cornerRadius = 20,
 }) => (
   <svg
     style={{
@@ -75,8 +78,10 @@ const GlassFilter: React.FC<{
       width,
       height,
       pointerEvents: "none",
+      overflow: "hidden",
     }}
     aria-hidden="true"
+    clipPath={`inset(0 round ${cornerRadius}px)`}
   >
     <defs>
       <radialGradient id={`${id}-edge-mask`} cx="50%" cy="50%" r="50%">
@@ -311,7 +316,13 @@ const EnhancedGlassContainer = forwardRef<
       <div
         ref={ref}
         className={`relative ${className} ${active ? "active" : ""} ${Boolean(onClick) ? "cursor-pointer" : ""}`}
-        style={style}
+        style={{
+          ...style,
+          borderRadius: `${cornerRadius}px`,
+          overflow: "hidden",
+          clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+        }}
         onClick={onClick}
       >
         <GlassFilter
@@ -322,6 +333,7 @@ const EnhancedGlassContainer = forwardRef<
           width={glassSize.width}
           height={glassSize.height}
           shaderMapUrl={shaderMapUrl}
+          cornerRadius={cornerRadius}
         />
 
         <div
@@ -333,13 +345,15 @@ const EnhancedGlassContainer = forwardRef<
             alignItems: "center",
             gap: "24px",
             padding,
-            overflow: "visible",
+            overflow: "hidden",
             transition: "all 0.2s ease-in-out",
             boxShadow: overLight
               ? "0px 16px 70px rgba(0, 0, 0, 0.75)"
               : "0px 12px 40px rgba(0, 0, 0, 0.25)",
             width: "100%",
             height: "100%",
+            clipPath: `inset(0 round ${cornerRadius}px)`,
+            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
           }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
@@ -356,6 +370,8 @@ const EnhancedGlassContainer = forwardRef<
                 inset: "0",
                 borderRadius: `${cornerRadius}px`,
                 overflow: "hidden",
+                clipPath: `inset(0 round ${cornerRadius}px)`,
+                WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
               } as CSSProperties
             }
           />
@@ -436,24 +452,9 @@ export default function EnhancedLiquidGlass({
   contrast: _contrast = 120,
 }: EnhancedLiquidGlassProps) {
   const glassRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const measureRef = useRef<HTMLDivElement>(null);
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  
   const [isHovered, setIsHovered] = useState(false);
   const [isActive, setIsActive] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [contentMeasured, setContentMeasured] = useState(false);
-
-  const [glassSize, setGlassSize] = useState({
-    width: width ?? minWidth,
-    height: height ?? minHeight,
-  });
-  const [position, setPosition] = useState({
-    x: initialPosition?.x ?? 0,
-    y: initialPosition?.y ?? 0,
-    centered: !initialPosition,
-  });
   const [internalGlobalMousePos, setInternalGlobalMousePos] = useState({
     x: 0,
     y: 0,
@@ -463,64 +464,29 @@ export default function EnhancedLiquidGlass({
     y: 0,
   });
 
+  // Use shared glass behavior hook
+  const {
+    glassSize,
+    position,
+    isDragging,
+    measureRef,
+    containerRef,
+    measureStyle,
+    handleMouseDown,
+  } = useGlassBehavior({
+    width,
+    height,
+    padding,
+    initialPosition,
+    draggable,
+    minWidth,
+    minHeight,
+    children,
+  });
+
   // Use external mouse position if provided, otherwise use internal
   const globalMousePos = externalGlobalMousePos ?? internalGlobalMousePos;
   const mouseOffset = externalMouseOffset ?? internalMouseOffset;
-
-  const offset = 10; // Viewport boundary offset
-
-  // Parse padding values to get numeric values
-  const getPaddingValues = useCallback(
-    (
-      paddingStr: string,
-    ): { top: number; right: number; bottom: number; left: number } => {
-      const values = paddingStr
-        .split(" ")
-        .map((v) => parseInt(v.replace("px", "")) || 0);
-      if (values.length === 1)
-        return {
-          top: values[0]!,
-          right: values[0]!,
-          bottom: values[0]!,
-          left: values[0]!,
-        };
-      if (values.length === 2)
-        return {
-          top: values[0]!,
-          right: values[1]!,
-          bottom: values[0]!,
-          left: values[1]!,
-        };
-      if (values.length === 4)
-        return {
-          top: values[0]!,
-          right: values[1]!,
-          bottom: values[2]!,
-          left: values[3]!,
-        };
-      return { top: 24, right: 32, bottom: 24, left: 32 }; // default
-    },
-    [],
-  );
-
-  // Constrain position within viewport bounds
-  const constrainPosition = useCallback(
-    (x: number, y: number) => {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      const minX = offset;
-      const maxX = viewportWidth - glassSize.width - offset;
-      const minY = offset;
-      const maxY = viewportHeight - glassSize.height - offset;
-
-      const constrainedX = Math.max(minX, Math.min(maxX, x));
-      const constrainedY = Math.max(minY, Math.min(maxY, y));
-
-      return { x: constrainedX, y: constrainedY };
-    },
-    [glassSize.width, glassSize.height, offset],
-  );
 
   // Internal mouse tracking
   const handleMouseMove = useCallback(
@@ -679,206 +645,8 @@ export default function EnhancedLiquidGlass({
     };
   }, [globalMousePos, elasticity, calculateFadeInFactor]);
 
-  // Update glass size based on content
-  const updateGlassSize = useCallback(() => {
-    if (!measureRef.current || !children) return;
 
-    // Wait for next frame to ensure content is rendered
-    requestAnimationFrame(() => {
-      if (!measureRef.current) return;
 
-      const contentRect = measureRef.current.getBoundingClientRect();
-      const paddingValues = getPaddingValues(padding);
-
-      // If width/height are explicitly provided, use them
-      if (width && height) {
-        const newSize = { width, height };
-        if (
-          newSize.width !== glassSize.width ||
-          newSize.height !== glassSize.height
-        ) {
-          setGlassSize(newSize);
-        }
-        return;
-      }
-
-      // Calculate size based on content + padding
-      const contentWidth = contentRect.width;
-      const contentHeight = contentRect.height;
-
-      const totalWidth =
-        contentWidth + paddingValues.left + paddingValues.right;
-      const totalHeight =
-        contentHeight + paddingValues.top + paddingValues.bottom;
-
-      const newWidth = width ?? Math.max(totalWidth, minWidth);
-      const newHeight = height ?? Math.max(totalHeight, minHeight);
-
-      if (
-        Math.abs(newWidth - glassSize.width) > 1 ||
-        Math.abs(newHeight - glassSize.height) > 1
-      ) {
-        setGlassSize({ width: newWidth, height: newHeight });
-        setContentMeasured(true);
-      }
-    });
-  }, [
-    width,
-    height,
-    glassSize.width,
-    glassSize.height,
-    padding,
-    children,
-    minWidth,
-    minHeight,
-    getPaddingValues,
-  ]);
-
-  // Handle drag functionality
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (!draggable) return;
-
-      // Prevent dragging if user is interacting with form controls
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "BUTTON" ||
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "SELECT"
-      ) {
-        return;
-      }
-
-      // Also check if the target is inside a form control
-      if (target.closest("input, button, textarea, select")) {
-        return;
-      }
-
-      setIsDragging(true);
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const initialX = rect.left;
-      const initialY = rect.top;
-      let hasMoved = false;
-
-      const handleDragMove = (e: MouseEvent) => {
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-
-        // Only update position if there's actual movement
-        if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
-          if (!hasMoved) {
-            hasMoved = true;
-            // First movement - switch from centered to absolute positioning
-            if (position.centered) {
-              setPosition({
-                x: initialX,
-                y: initialY,
-                centered: false,
-              });
-            }
-          }
-
-          const newX = initialX + deltaX;
-          const newY = initialY + deltaY;
-
-          const constrained = constrainPosition(newX, newY);
-
-          setPosition({
-            x: constrained.x,
-            y: constrained.y,
-            centered: false,
-          });
-        }
-      };
-
-      const handleDragEnd = () => {
-        setIsDragging(false);
-        document.removeEventListener("mousemove", handleDragMove);
-        document.removeEventListener("mouseup", handleDragEnd);
-      };
-
-      document.addEventListener("mousemove", handleDragMove);
-      document.addEventListener("mouseup", handleDragEnd);
-
-      e.preventDefault();
-    },
-    [draggable, constrainPosition, position.centered],
-  );
-
-  // Update glass size when width/height props change
-  useEffect(() => {
-    if (width && height) {
-      setGlassSize({ width, height });
-    } else {
-      updateGlassSize();
-    }
-  }, [width, height, updateGlassSize]);
-
-  // Initial size measurement
-  useEffect(() => {
-    if (children && !contentMeasured) {
-      // Delay initial measurement to ensure DOM is ready
-      const timeout = setTimeout(() => {
-        updateGlassSize();
-      }, 0);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [children, contentMeasured, updateGlassSize]);
-
-  // Set up ResizeObserver for content changes
-  useEffect(() => {
-    if (!measureRef.current || !children) return;
-
-    if ("ResizeObserver" in window) {
-      const resizeObserver = new ResizeObserver(() => {
-        // Debounce updates to avoid excessive recalculations
-        if (resizeTimeoutRef.current) {
-          clearTimeout(resizeTimeoutRef.current);
-        }
-        resizeTimeoutRef.current = setTimeout(() => {
-          updateGlassSize();
-        }, 16); // ~60fps
-      });
-
-      resizeObserver.observe(measureRef.current);
-
-      return () => {
-        if (resizeTimeoutRef.current) {
-          clearTimeout(resizeTimeoutRef.current);
-        }
-        resizeObserver.disconnect();
-      };
-    }
-
-    // Fallback for browsers without ResizeObserver
-    const interval = setInterval(updateGlassSize, 100);
-    return () => clearInterval(interval);
-  }, [updateGlassSize, children]);
-
-  // Handle window resize to maintain constraints
-  useEffect(() => {
-    const handleResize = () => {
-      if (!position.centered) {
-        const constrained = constrainPosition(position.x, position.y);
-        if (position.x !== constrained.x || position.y !== constrained.y) {
-          setPosition({
-            x: constrained.x,
-            y: constrained.y,
-            centered: false,
-          });
-        }
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [position, constrainPosition]);
 
   const transformStyle = position.centered
     ? `translate(calc(-50% + ${calculateElasticTranslation().x}px), calc(-50% + ${calculateElasticTranslation().y}px)) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`
@@ -928,16 +696,6 @@ export default function EnhancedLiquidGlass({
         }),
   };
 
-  // Invisible measuring div that sizes naturally to content
-  const measureStyle: React.CSSProperties = {
-    position: "absolute",
-    visibility: "hidden",
-    pointerEvents: "none",
-    top: "-9999px",
-    left: "-9999px",
-    whiteSpace: "nowrap",
-    display: "inline-block",
-  };
 
   return (
     <>
@@ -958,6 +716,9 @@ export default function EnhancedLiquidGlass({
           borderRadius: `${cornerRadius}px`,
           pointerEvents: "none",
           transition: baseStyle.transition,
+          overflow: "hidden",
+          clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
         }}
       />
       <div
@@ -969,6 +730,9 @@ export default function EnhancedLiquidGlass({
           borderRadius: `${cornerRadius}px`,
           pointerEvents: "none",
           transition: baseStyle.transition,
+          overflow: "hidden",
+          clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
         }}
       />
 
@@ -1027,6 +791,9 @@ export default function EnhancedLiquidGlass({
             rgba(255, 255, 255, 0.0) 100%
           )`,
           borderRadius: `${cornerRadius}px`,
+          overflow: "hidden",
+          clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
         }}
       />
 
@@ -1052,6 +819,9 @@ export default function EnhancedLiquidGlass({
             rgba(255, 255, 255, 0.0) 100%
           )`,
           borderRadius: `${cornerRadius}px`,
+          overflow: "hidden",
+          clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
         }}
       />
 
@@ -1062,7 +832,7 @@ export default function EnhancedLiquidGlass({
             style={{
               ...borderPositionStyles,
               height: glassSize.height,
-              width: glassSize.width + 1,
+              width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
               transition: "all 0.2s ease-out",
@@ -1070,13 +840,16 @@ export default function EnhancedLiquidGlass({
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%)",
               mixBlendMode: "overlay",
+              overflow: "hidden",
+              clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
             }}
           />
           <div
             style={{
               ...borderPositionStyles,
               height: glassSize.height,
-              width: glassSize.width + 1,
+              width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
               transition: "all 0.2s ease-out",
@@ -1084,13 +857,16 @@ export default function EnhancedLiquidGlass({
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 80%)",
               mixBlendMode: "overlay",
+              overflow: "hidden",
+              clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
             }}
           />
           <div
             style={{
               ...borderPositionStyles,
               height: glassSize.height,
-              width: glassSize.width + 1,
+              width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
               transition: "all 0.2s ease-out",
@@ -1098,6 +874,9 @@ export default function EnhancedLiquidGlass({
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100%)",
               mixBlendMode: "overlay",
+              overflow: "hidden",
+              clipPath: `inset(0 round ${cornerRadius}px)`,
+          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
             }}
           />
         </>

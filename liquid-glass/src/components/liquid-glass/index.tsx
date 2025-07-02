@@ -1,5 +1,6 @@
-import { useRef, useEffect, useCallback, useState, forwardRef } from "react";
+import { useRef, useEffect, useCallback, forwardRef } from "react";
 import { utils } from "./impl/utils";
+import { useGlassBehavior } from "./impl/use-glass-behavior";
 
 interface LiquidGlassProps {
   children?: React.ReactNode;
@@ -44,28 +45,32 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
     ref,
   ) => {
     const id = useRef(utils.generateId());
-    const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const feImageRef = useRef<SVGFEImageElement>(null);
     const feDisplacementMapRef = useRef<SVGFEDisplacementMapElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    const measureRef = useRef<HTMLDivElement>(null);
-    const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [glassSize, setGlassSize] = useState({
-      width: width ?? minWidth,
-      height: height ?? minHeight,
+    // Use shared glass behavior hook
+    const {
+      glassSize,
+      position,
+      isDragging,
+      measureRef,
+      containerRef,
+      measureStyle,
+      handleMouseDown,
+    } = useGlassBehavior({
+      width,
+      height,
+      padding,
+      initialPosition,
+      draggable,
+      minWidth,
+      minHeight,
+      children,
     });
-    const [position, setPosition] = useState({
-      x: initialPosition?.x ?? 0,
-      y: initialPosition?.y ?? 0,
-      centered: !initialPosition,
-    });
-    const [isDragging, setIsDragging] = useState(false);
-    const [contentMeasured, setContentMeasured] = useState(false);
 
     const canvasDPI = 1;
-    const offset = 10; // Viewport boundary offset
 
     // Fragment shader function - creates the liquid glass distortion
     const fragmentShader = useCallback((uv: { x: number; y: number }) => {
@@ -147,173 +152,8 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       displacementScale,
     ]);
 
-    // Parse padding values to get numeric values
-    const getPaddingValues = useCallback(
-      (
-        paddingStr: string,
-      ): { top: number; right: number; bottom: number; left: number } => {
-        const values = paddingStr
-          .split(" ")
-          .map((v) => parseInt(v.replace("px", "")) || 0);
-        if (values.length === 1)
-          return {
-            top: values[0]!,
-            right: values[0]!,
-            bottom: values[0]!,
-            left: values[0]!,
-          };
-        if (values.length === 2)
-          return {
-            top: values[0]!,
-            right: values[1]!,
-            bottom: values[0]!,
-            left: values[1]!,
-          };
-        if (values.length === 4)
-          return {
-            top: values[0]!,
-            right: values[1]!,
-            bottom: values[2]!,
-            left: values[3]!,
-          };
-        return { top: 24, right: 32, bottom: 24, left: 32 }; // default
-      },
-      [],
-    );
 
-    // Update glass size based on content
-    const updateGlassSize = useCallback(() => {
-      if (!measureRef.current || !children) return;
 
-      // Wait for next frame to ensure content is rendered
-      requestAnimationFrame(() => {
-        if (!measureRef.current) return;
-
-        const contentRect = measureRef.current.getBoundingClientRect();
-        const paddingValues = getPaddingValues(padding);
-
-        // If width/height are explicitly provided, use them
-        if (width && height) {
-          const newSize = { width, height };
-          if (
-            newSize.width !== glassSize.width ||
-            newSize.height !== glassSize.height
-          ) {
-            setGlassSize(newSize);
-          }
-          return;
-        }
-
-        // Calculate size based on content + padding
-        const contentWidth = contentRect.width;
-        const contentHeight = contentRect.height;
-
-        const totalWidth =
-          contentWidth + paddingValues.left + paddingValues.right;
-        const totalHeight =
-          contentHeight + paddingValues.top + paddingValues.bottom;
-
-        const newWidth = width ?? Math.max(totalWidth, minWidth);
-        const newHeight = height ?? Math.max(totalHeight, minHeight);
-
-        if (
-          Math.abs(newWidth - glassSize.width) > 1 ||
-          Math.abs(newHeight - glassSize.height) > 1
-        ) {
-          setGlassSize({ width: newWidth, height: newHeight });
-          setContentMeasured(true);
-        }
-      });
-    }, [
-      width,
-      height,
-      glassSize.width,
-      glassSize.height,
-      padding,
-      children,
-      minWidth,
-      minHeight,
-      getPaddingValues,
-    ]);
-
-    // Constrain position within viewport bounds
-    const constrainPosition = useCallback(
-      (x: number, y: number) => {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        const minX = offset;
-        const maxX = viewportWidth - glassSize.width - offset;
-        const minY = offset;
-        const maxY = viewportHeight - glassSize.height - offset;
-
-        const constrainedX = Math.max(minX, Math.min(maxX, x));
-        const constrainedY = Math.max(minY, Math.min(maxY, y));
-
-        return { x: constrainedX, y: constrainedY };
-      },
-      [glassSize.width, glassSize.height, offset],
-    );
-
-    // Handle drag functionality
-    const handleMouseDown = useCallback(
-      (e: React.MouseEvent) => {
-        if (!draggable) return;
-
-        // Prevent dragging if user is interacting with form controls
-        const target = e.target as HTMLElement;
-        if (
-          target.tagName === "INPUT" ||
-          target.tagName === "BUTTON" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT"
-        ) {
-          return;
-        }
-
-        // Also check if the target is inside a form control
-        if (target.closest("input, button, textarea, select")) {
-          return;
-        }
-
-        setIsDragging(true);
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const initialX = rect.left;
-        const initialY = rect.top;
-
-        const handleDragMove = (e: MouseEvent) => {
-          const deltaX = e.clientX - startX;
-          const deltaY = e.clientY - startY;
-
-          const newX = initialX + deltaX;
-          const newY = initialY + deltaY;
-
-          const constrained = constrainPosition(newX, newY);
-
-          setPosition({
-            x: constrained.x,
-            y: constrained.y,
-            centered: false,
-          });
-        };
-
-        const handleDragEnd = () => {
-          setIsDragging(false);
-          document.removeEventListener("mousemove", handleDragMove);
-          document.removeEventListener("mouseup", handleDragEnd);
-        };
-
-        document.addEventListener("mousemove", handleDragMove);
-        document.addEventListener("mouseup", handleDragEnd);
-
-        e.preventDefault();
-      },
-      [draggable, constrainPosition],
-    );
 
     // Setup canvas and initial shader update
     useEffect(() => {
@@ -326,75 +166,6 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       updateShader();
     }, [glassSize.width, glassSize.height, canvasDPI, updateShader]);
 
-    // Update glass size when width/height props change
-    useEffect(() => {
-      if (width && height) {
-        setGlassSize({ width, height });
-      } else {
-        updateGlassSize();
-      }
-    }, [width, height, updateGlassSize]);
-
-    // Initial size measurement
-    useEffect(() => {
-      if (children && !contentMeasured) {
-        // Delay initial measurement to ensure DOM is ready
-        const timeout = setTimeout(() => {
-          updateGlassSize();
-        }, 0);
-
-        return () => clearTimeout(timeout);
-      }
-    }, [children, contentMeasured, updateGlassSize]);
-
-    // Set up ResizeObserver for content changes
-    useEffect(() => {
-      if (!measureRef.current || !children) return;
-
-      if ("ResizeObserver" in window) {
-        const resizeObserver = new ResizeObserver(() => {
-          // Debounce updates to avoid excessive recalculations
-          if (resizeTimeoutRef.current) {
-            clearTimeout(resizeTimeoutRef.current);
-          }
-          resizeTimeoutRef.current = setTimeout(() => {
-            updateGlassSize();
-          }, 16); // ~60fps
-        });
-
-        resizeObserver.observe(measureRef.current);
-
-        return () => {
-          if (resizeTimeoutRef.current) {
-            clearTimeout(resizeTimeoutRef.current);
-          }
-          resizeObserver.disconnect();
-        };
-      }
-
-      // Fallback for browsers without ResizeObserver
-      const interval = setInterval(updateGlassSize, 100);
-      return () => clearInterval(interval);
-    }, [updateGlassSize, children]);
-
-    // Handle window resize to maintain constraints
-    useEffect(() => {
-      const handleResize = () => {
-        if (!position.centered) {
-          const constrained = constrainPosition(position.x, position.y);
-          if (position.x !== constrained.x || position.y !== constrained.y) {
-            setPosition({
-              x: constrained.x,
-              y: constrained.y,
-              centered: false,
-            });
-          }
-        }
-      };
-
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }, [position, constrainPosition]);
 
     const containerStyle: React.CSSProperties = {
       width: glassSize.width,
@@ -434,16 +205,6 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       position: "relative",
     };
 
-    // Invisible measuring div that sizes naturally to content
-    const measureStyle: React.CSSProperties = {
-      position: "absolute",
-      visibility: "hidden",
-      pointerEvents: "none",
-      top: "-9999px",
-      left: "-9999px",
-      whiteSpace: "nowrap",
-      display: "inline-block",
-    };
 
     return (
       <>
