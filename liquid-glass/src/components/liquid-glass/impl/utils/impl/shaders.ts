@@ -1,18 +1,7 @@
-// Enhanced shader utilities for WebGL-based displacement map generation
-import { utils, type Vec2 } from "./utils";
+import { smoothStep, length, roundedRectSDF, texture } from "./utils";
+import type { Vec2, ShaderOptions } from "../../../types";
 
-export interface ShaderOptions {
-  width: number;
-  height: number;
-  fragment: (uv: Vec2, mouse?: Vec2) => Vec2;
-  mousePosition?: Vec2;
-}
-
-// Re-export for convenience
-const { smoothStep, length, roundedRectSDF, texture } = utils;
-
-// Shader fragment functions for different effects
-export const fragmentShaders = {
+const fragmentShaders = {
   liquidGlass: (uv: Vec2): Vec2 => {
     const ix = uv.x - 0.5;
     const iy = uv.y - 0.5;
@@ -47,16 +36,14 @@ export const fragmentShaders = {
       Math.sin(newAngle) * radius + 0.5,
     );
   },
-};
+} as const;
 
-export type FragmentShaderType = keyof typeof fragmentShaders;
+class ShaderDisplacementGenerator {
+  private readonly canvas: HTMLCanvasElement;
+  private readonly context: CanvasRenderingContext2D;
+  private readonly canvasDPI = 1;
 
-export class ShaderDisplacementGenerator {
-  private canvas: HTMLCanvasElement;
-  private context: CanvasRenderingContext2D;
-  private canvasDPI = 1;
-
-  constructor(private options: ShaderOptions) {
+  constructor(private readonly options: ShaderOptions) {
     this.canvas = document.createElement("canvas");
     this.canvas.width = options.width * this.canvasDPI;
     this.canvas.height = options.height * this.canvasDPI;
@@ -72,57 +59,42 @@ export class ShaderDisplacementGenerator {
   updateShader(mousePosition?: Vec2): string {
     const w = this.options.width * this.canvasDPI;
     const h = this.options.height * this.canvasDPI;
-
-    let maxScale = 0;
     const rawValues: number[] = [];
+    let maxScale = 0;
 
-    // Calculate displacement values
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const uv: Vec2 = { x: x / w, y: y / h };
-
         const pos = this.options.fragment(uv, mousePosition);
         const dx = pos.x * w - x;
         const dy = pos.y * h - y;
-
         maxScale = Math.max(maxScale, Math.abs(dx), Math.abs(dy));
         rawValues.push(dx, dy);
       }
     }
 
-    // Improved normalization to prevent artifacts while maintaining intensity
-    if (maxScale > 0) {
-      maxScale = Math.max(maxScale, 1); // Ensure minimum scale to prevent over-normalization
-    } else {
-      maxScale = 1;
-    }
+    maxScale = maxScale > 0 ? Math.max(maxScale, 1) : 1;
 
-    // Create ImageData and fill it
     const imageData = this.context.createImageData(w, h);
     const data = imageData.data;
-
-    // Convert to image data with smoother normalization
     let rawIndex = 0;
+
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const dx = rawValues[rawIndex++] ?? 0;
         const dy = rawValues[rawIndex++] ?? 0;
-
-        // Smooth the displacement values at edges to prevent hard transitions
         const edgeDistance = Math.min(x, y, w - x - 1, h - y - 1);
-        const edgeFactor = Math.min(1, edgeDistance / 2); // Smooth within 2 pixels of edge
-
+        const edgeFactor = Math.min(1, edgeDistance / 2);
         const smoothedDx = dx * edgeFactor;
         const smoothedDy = dy * edgeFactor;
-
         const r = smoothedDx / maxScale + 0.5;
         const g = smoothedDy / maxScale + 0.5;
-
         const pixelIndex = (y * w + x) * 4;
-        data[pixelIndex] = Math.max(0, Math.min(255, r * 255)); // Red channel (X displacement)
-        data[pixelIndex + 1] = Math.max(0, Math.min(255, g * 255)); // Green channel (Y displacement)
-        data[pixelIndex + 2] = Math.max(0, Math.min(255, g * 255)); // Blue channel (Y displacement for SVG filter compatibility)
-        data[pixelIndex + 3] = 255; // Alpha channel
+
+        data[pixelIndex] = Math.max(0, Math.min(255, r * 255));
+        data[pixelIndex + 1] = Math.max(0, Math.min(255, g * 255));
+        data[pixelIndex + 2] = Math.max(0, Math.min(255, g * 255));
+        data[pixelIndex + 3] = 255;
       }
     }
 
@@ -139,6 +111,4 @@ export class ShaderDisplacementGenerator {
   }
 }
 
-// Re-export utilities for backward compatibility
-export { utils as mathUtils } from "./utils";
-export type { Vec2 } from "./utils";
+export { ShaderDisplacementGenerator, fragmentShaders };

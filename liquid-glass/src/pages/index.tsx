@@ -1,7 +1,7 @@
 import Head from "next/head";
 import { useState } from "react";
 import LiquidGlass from "~/components/liquid-glass";
-import EnhancedLiquidGlass from "~/components/liquid-glass/impl/enhanced";
+import { EnhancedLiquidGlass } from "~/components/liquid-glass";
 import ModeSwitcher from "~/components/mode-switcher";
 import DisplacementModeControls from "~/components/displacement-mode-controls";
 

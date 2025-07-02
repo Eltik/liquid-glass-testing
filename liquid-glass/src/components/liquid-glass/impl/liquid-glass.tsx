@@ -1,25 +1,7 @@
 import { useRef, useEffect, useCallback, forwardRef } from "react";
-import { utils } from "./impl/utils";
-import { useGlassBehavior } from "./impl/use-glass-behavior";
-
-interface LiquidGlassProps {
-  children?: React.ReactNode;
-  width?: number;
-  height?: number;
-  className?: string;
-  style?: React.CSSProperties;
-  padding?: string;
-  cornerRadius?: number;
-  displacementScale?: number;
-  blurAmount?: number;
-  saturation?: number;
-  brightness?: number;
-  contrast?: number;
-  initialPosition?: { x?: number; y?: number };
-  draggable?: boolean;
-  minWidth?: number;
-  minHeight?: number;
-}
+import { utils } from "./utils";
+import { useGlassBehavior } from "./utils/impl/use-glass-behavior";
+import type { LiquidGlassProps } from "../types";
 
 const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
   (
@@ -152,9 +134,6 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       displacementScale,
     ]);
 
-
-
-
     // Setup canvas and initial shader update
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -165,7 +144,6 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
 
       updateShader();
     }, [glassSize.width, glassSize.height, canvasDPI, updateShader]);
-
 
     const containerStyle: React.CSSProperties = {
       width: glassSize.width,
@@ -204,7 +182,6 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       justifyContent: "center",
       position: "relative",
     };
-
 
     return (
       <>

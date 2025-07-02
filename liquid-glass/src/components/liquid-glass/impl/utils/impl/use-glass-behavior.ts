@@ -53,7 +53,8 @@ export function useGlassBehavior({
 
   // Use shared position constraint utility
   const constrainPosition = useCallback(
-    (x: number, y: number) => utils.constrainPosition(x, y, glassSize.width, glassSize.height, offset),
+    (x: number, y: number) =>
+      utils.constrainPosition(x, y, glassSize.width, glassSize.height, offset),
     [glassSize.width, glassSize.height, offset],
   );
 

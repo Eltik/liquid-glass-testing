@@ -7,13 +7,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { ShaderDisplacementGenerator, fragmentShaders } from "./shaders";
+import { ShaderDisplacementGenerator, fragmentShaders } from "./utils/impl/shaders";
 import {
   getDisplacementMap,
   getPolarDisplacementMap,
   getProminentDisplacementMap,
-} from "./displacement-maps";
-import { useGlassBehavior } from "./use-glass-behavior";
+} from "./utils/impl/displacement-maps";
+import { useGlassBehavior } from "./utils/impl/use-glass-behavior";
+import type { EnhancedLiquidGlassProps } from "../types";
 
 // Generate shader-based displacement map using shaderUtils
 const generateShaderDisplacementMap = (
@@ -398,33 +399,6 @@ const EnhancedGlassContainer = forwardRef<
 
 EnhancedGlassContainer.displayName = "EnhancedGlassContainer";
 
-interface EnhancedLiquidGlassProps {
-  children?: React.ReactNode;
-  width?: number;
-  height?: number;
-  className?: string;
-  style?: React.CSSProperties;
-  padding?: string;
-  cornerRadius?: number;
-  displacementScale?: number;
-  blurAmount?: number;
-  saturation?: number;
-  aberrationIntensity?: number;
-  elasticity?: number;
-  globalMousePos?: { x: number; y: number };
-  mouseOffset?: { x: number; y: number };
-  mouseContainer?: React.RefObject<HTMLElement | null> | null;
-  overLight?: boolean;
-  mode?: "standard" | "polar" | "prominent" | "shader";
-  onClick?: () => void;
-  initialPosition?: { x?: number; y?: number };
-  draggable?: boolean;
-  minWidth?: number;
-  minHeight?: number;
-  brightness?: number;
-  contrast?: number;
-}
-
 export default function EnhancedLiquidGlass({
   children,
   width,
@@ -452,7 +426,7 @@ export default function EnhancedLiquidGlass({
   contrast: _contrast = 120,
 }: EnhancedLiquidGlassProps) {
   const glassRef = useRef<HTMLDivElement>(null);
-  
+
   const [isHovered, setIsHovered] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [internalGlobalMousePos, setInternalGlobalMousePos] = useState({
@@ -645,9 +619,6 @@ export default function EnhancedLiquidGlass({
     };
   }, [globalMousePos, elasticity, calculateFadeInFactor]);
 
-
-
-
   const transformStyle = position.centered
     ? `translate(calc(-50% + ${calculateElasticTranslation().x}px), calc(-50% + ${calculateElasticTranslation().y}px)) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`
     : `translate(${calculateElasticTranslation().x}px, ${calculateElasticTranslation().y}px) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`;
@@ -695,7 +666,6 @@ export default function EnhancedLiquidGlass({
           zIndex: 9999,
         }),
   };
-
 
   return (
     <>
@@ -842,7 +812,7 @@ export default function EnhancedLiquidGlass({
               mixBlendMode: "overlay",
               overflow: "hidden",
               clipPath: `inset(0 round ${cornerRadius}px)`,
-          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+              WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
             }}
           />
           <div
@@ -859,7 +829,7 @@ export default function EnhancedLiquidGlass({
               mixBlendMode: "overlay",
               overflow: "hidden",
               clipPath: `inset(0 round ${cornerRadius}px)`,
-          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+              WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
             }}
           />
           <div
@@ -876,7 +846,7 @@ export default function EnhancedLiquidGlass({
               mixBlendMode: "overlay",
               overflow: "hidden",
               clipPath: `inset(0 round ${cornerRadius}px)`,
-          WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+              WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
             }}
           />
         </>
