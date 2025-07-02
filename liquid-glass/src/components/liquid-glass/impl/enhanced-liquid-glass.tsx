@@ -7,7 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { ShaderDisplacementGenerator, fragmentShaders } from "./utils/impl/shaders";
+import {
+  ShaderDisplacementGenerator,
+  fragmentShaders,
+} from "./utils/impl/shaders";
 import {
   getDisplacementMap,
   getPolarDisplacementMap,
@@ -74,8 +77,7 @@ const GlassFilter: React.FC<{
   <svg
     style={{
       position: "absolute",
-      top: 0,
-      left: 0,
+      transform: "translate3d(0, 0, 0)",
       width,
       height,
       pointerEvents: "none",
@@ -620,8 +622,8 @@ export default function EnhancedLiquidGlass({
   }, [globalMousePos, elasticity, calculateFadeInFactor]);
 
   const transformStyle = position.centered
-    ? `translate(calc(-50% + ${calculateElasticTranslation().x}px), calc(-50% + ${calculateElasticTranslation().y}px)) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`
-    : `translate(${calculateElasticTranslation().x}px, ${calculateElasticTranslation().y}px) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`;
+    ? `translate3d(calc(-50% + ${calculateElasticTranslation().x}px), calc(-50% + ${calculateElasticTranslation().y}px), 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`
+    : `translate3d(${calculateElasticTranslation().x}px, ${calculateElasticTranslation().y}px, 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`;
 
   const baseStyle = {
     ...style,
@@ -632,16 +634,16 @@ export default function EnhancedLiquidGlass({
   const borderPositionStyles: React.CSSProperties = position.centered
     ? {
         position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: transformStyle,
+        transform: transformStyle
+          .replace("translate3d(calc(-50% + ", "translate3d(calc(50vw - 50% + ")
+          .replace("), calc(-50% + ", "), calc(50vh - 50% + "),
         zIndex: 10000,
       }
     : {
         position: "fixed",
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: isDragging ? "none" : transformStyle,
+        transform: isDragging
+          ? `translate3d(${position.x}px, ${position.y}px, 0)`
+          : `translate3d(${position.x + calculateElasticTranslation().x}px, ${position.y + calculateElasticTranslation().y}px, 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`,
         zIndex: 10000,
       };
 
@@ -653,16 +655,19 @@ export default function EnhancedLiquidGlass({
     ...(position.centered
       ? {
           position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: transformStyle,
+          transform: transformStyle
+            .replace(
+              "translate3d(calc(-50% + ",
+              "translate3d(calc(50vw - 50% + ",
+            )
+            .replace("), calc(-50% + ", "), calc(50vh - 50% + "),
           zIndex: 9999,
         }
       : {
           position: "fixed",
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          transform: isDragging ? "none" : transformStyle,
+          transform: isDragging
+            ? `translate3d(${position.x}px, ${position.y}px, 0)`
+            : `translate3d(${position.x + calculateElasticTranslation().x}px, ${position.y + calculateElasticTranslation().y}px, 0) ${isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale()}`,
           zIndex: 9999,
         }),
   };

@@ -158,16 +158,12 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
       ...(position.centered
         ? {
             position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
+            transform: "translate3d(calc(50vw - 50%), calc(50vh - 50%), 0)",
             zIndex: 9999,
           }
         : {
             position: "fixed",
-            left: `${position.x}px`,
-            top: `${position.y}px`,
-            transform: "none",
+            transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
             zIndex: 9999,
           }),
       ...style,
@@ -205,7 +201,8 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(
           xmlns="http://www.w3.org/2000/svg"
           width="0"
           height="0"
-          className="pointer-events-none fixed top-0 left-0 z-[9998]"
+          className="pointer-events-none fixed z-[9998]"
+          style={{ transform: "translate3d(0, 0, 0)" }}
         >
           <defs>
             <filter

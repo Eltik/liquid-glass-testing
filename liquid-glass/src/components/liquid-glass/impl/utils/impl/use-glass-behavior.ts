@@ -263,8 +263,7 @@ export function useGlassBehavior({
     position: "absolute",
     visibility: "hidden",
     pointerEvents: "none",
-    top: "-9999px",
-    left: "-9999px",
+    transform: "translate3d(-9999px, -9999px, 0)",
     whiteSpace: "nowrap",
     display: "inline-block",
   };
