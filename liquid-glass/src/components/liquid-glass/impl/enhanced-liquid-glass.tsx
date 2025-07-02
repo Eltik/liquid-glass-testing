@@ -349,7 +349,7 @@ const EnhancedGlassContainer = forwardRef<
             gap: "24px",
             padding,
             overflow: "hidden",
-            transition: "all 0.2s ease-in-out",
+            transition: "transform 0.2s ease-in-out, opacity 0.2s ease-in-out",
             boxShadow: overLight
               ? "0px 16px 70px rgba(0, 0, 0, 0.75)"
               : "0px 12px 40px rgba(0, 0, 0, 0.25)",
@@ -439,6 +439,22 @@ export default function EnhancedLiquidGlass({
     x: 0,
     y: 0,
   });
+  
+  // Pre-calculate static CSS values to avoid recalculation
+  const borderGradientRef = useRef({
+    angle: 135,
+    opacity1: 0.12,
+    opacity2: 0.4,
+    stop1: 33,
+    stop2: 66,
+  });
+  const overlayGradientRef = useRef({
+    angle: 135,
+    opacity1: 0.32,
+    opacity2: 0.6,
+    stop1: 33,
+    stop2: 66,
+  });
 
   // Use shared glass behavior hook
   const {
@@ -464,29 +480,62 @@ export default function EnhancedLiquidGlass({
   const globalMousePos = externalGlobalMousePos ?? internalGlobalMousePos;
   const mouseOffset = externalMouseOffset ?? internalMouseOffset;
 
-  // Internal mouse tracking
+  // RAF throttling for mouse move events
+  const rafIdRef = useRef<number | undefined>(undefined);
+  
+  // Internal mouse tracking with RAF throttling for performance
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
-      const container = mouseContainer?.current ?? glassRef.current;
-      if (!container) {
-        return;
+      if (rafIdRef.current) {
+        return; // Skip if already scheduled
       }
+      
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = undefined;
+        
+        const container = mouseContainer?.current ?? glassRef.current;
+        if (!container) {
+          return;
+        }
 
-      const rect = container.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
 
-      setInternalMouseOffset({
-        x: ((e.clientX - centerX) / rect.width) * 100,
-        y: ((e.clientY - centerY) / rect.height) * 100,
-      });
+        const newMouseOffset = {
+          x: ((e.clientX - centerX) / rect.width) * 100,
+          y: ((e.clientY - centerY) / rect.height) * 100,
+        };
+        
+        const newGlobalMousePos = {
+          x: e.clientX,
+          y: e.clientY,
+        };
 
-      setInternalGlobalMousePos({
-        x: e.clientX,
-        y: e.clientY,
+        // Update gradient values for border effects using transform instead of background recalculation
+        if (!isDragging) {
+          borderGradientRef.current = {
+            angle: 135 + newMouseOffset.x * 1.2,
+            opacity1: 0.12 + Math.abs(newMouseOffset.x) * 0.008,
+            opacity2: 0.4 + Math.abs(newMouseOffset.x) * 0.012,
+            stop1: Math.max(10, 33 + newMouseOffset.y * 0.3),
+            stop2: Math.min(90, 66 + newMouseOffset.y * 0.4),
+          };
+          
+          overlayGradientRef.current = {
+            angle: 135 + newMouseOffset.x * 1.2,
+            opacity1: 0.32 + Math.abs(newMouseOffset.x) * 0.008,
+            opacity2: 0.6 + Math.abs(newMouseOffset.x) * 0.012,
+            stop1: Math.max(10, 33 + newMouseOffset.y * 0.3),
+            stop2: Math.min(90, 66 + newMouseOffset.y * 0.4),
+          };
+        }
+
+        setInternalMouseOffset(newMouseOffset);
+        setInternalGlobalMousePos(newGlobalMousePos);
       });
     },
-    [mouseContainer],
+    [mouseContainer, isDragging],
   );
 
   // Set up mouse tracking if no external mouse position is provided
@@ -505,6 +554,10 @@ export default function EnhancedLiquidGlass({
 
     return () => {
       container.removeEventListener("mousemove", handleMouseMove);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = undefined;
+      }
     };
   }, [
     handleMouseMove,
@@ -687,7 +740,7 @@ export default function EnhancedLiquidGlass({
           width: glassSize.width,
           borderRadius: `${cornerRadius}px`,
           pointerEvents: "none",
-          transition: isDragging ? "none" : "all 0.15s ease-in-out",
+          transition: isDragging ? "none" : "transform 0.15s ease-in-out, opacity 0.15s ease-in-out",
           overflow: "hidden",
           clipPath: `inset(0 round ${cornerRadius}px)`,
           WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
@@ -701,7 +754,7 @@ export default function EnhancedLiquidGlass({
           width: glassSize.width,
           borderRadius: `${cornerRadius}px`,
           pointerEvents: "none",
-          transition: isDragging ? "none" : "all 0.15s ease-in-out",
+          transition: isDragging ? "none" : "transform 0.15s ease-in-out, opacity 0.15s ease-in-out",
           overflow: "hidden",
           clipPath: `inset(0 round ${cornerRadius}px)`,
           WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
@@ -749,18 +802,18 @@ export default function EnhancedLiquidGlass({
           mixBlendMode: "screen",
           opacity: 0.2,
           padding: "1.5px",
-          transition: isDragging ? "none" : "all ease-out 0.2s",
+          transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
           WebkitMask:
             "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
           WebkitMaskComposite: "xor",
           maskComposite: "exclude",
           boxShadow:
             "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-          background: isDragging ? "linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.4) 66%, rgba(255, 255, 255, 0.0) 100%)" : `linear-gradient(
-            ${135 + mouseOffset.x * 1.2}deg,
+          background: isDragging ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.4) 66%, rgba(255, 255, 255, 0.0) 100%)` : `linear-gradient(
+            ${borderGradientRef.current.angle}deg,
             rgba(255, 255, 255, 0.0) 0%,
-            rgba(255, 255, 255, ${0.12 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
-            rgba(255, 255, 255, ${0.4 + Math.abs(mouseOffset.x) * 0.012}) ${Math.min(90, 66 + mouseOffset.y * 0.4)}%,
+            rgba(255, 255, 255, ${borderGradientRef.current.opacity1}) ${borderGradientRef.current.stop1}%,
+            rgba(255, 255, 255, ${borderGradientRef.current.opacity2}) ${borderGradientRef.current.stop2}%,
             rgba(255, 255, 255, 0.0) 100%
           )`,
           borderRadius: `${cornerRadius}px`,
@@ -778,18 +831,18 @@ export default function EnhancedLiquidGlass({
           pointerEvents: "none",
           mixBlendMode: "overlay",
           padding: "1.5px",
-          transition: isDragging ? "none" : "all ease-out 0.2s",
+          transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
           WebkitMask:
             "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
           WebkitMaskComposite: "xor",
           maskComposite: "exclude",
           boxShadow:
             "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-          background: isDragging ? "linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.32) 33%, rgba(255, 255, 255, 0.6) 66%, rgba(255, 255, 255, 0.0) 100%)" : `linear-gradient(
-            ${135 + mouseOffset.x * 1.2}deg,
+          background: isDragging ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.32) 33%, rgba(255, 255, 255, 0.6) 66%, rgba(255, 255, 255, 0.0) 100%)` : `linear-gradient(
+            ${overlayGradientRef.current.angle}deg,
             rgba(255, 255, 255, 0.0) 0%,
-            rgba(255, 255, 255, ${0.32 + Math.abs(mouseOffset.x) * 0.008}) ${Math.max(10, 33 + mouseOffset.y * 0.3)}%,
-            rgba(255, 255, 255, ${0.6 + Math.abs(mouseOffset.x) * 0.012}) ${Math.min(90, 66 + mouseOffset.y * 0.4)}%,
+            rgba(255, 255, 255, ${overlayGradientRef.current.opacity1}) ${overlayGradientRef.current.stop1}%,
+            rgba(255, 255, 255, ${overlayGradientRef.current.opacity2}) ${overlayGradientRef.current.stop2}%,
             rgba(255, 255, 255, 0.0) 100%
           )`,
           borderRadius: `${cornerRadius}px`,
@@ -809,7 +862,7 @@ export default function EnhancedLiquidGlass({
               width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
-              transition: isDragging ? "none" : "all 0.2s ease-out",
+              transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
               opacity: isHovered || isActive ? 0.5 : 0,
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%)",
@@ -826,7 +879,7 @@ export default function EnhancedLiquidGlass({
               width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
-              transition: isDragging ? "none" : "all 0.2s ease-out",
+              transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
               opacity: isActive ? 0.5 : 0,
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 80%)",
@@ -843,7 +896,7 @@ export default function EnhancedLiquidGlass({
               width: glassSize.width,
               borderRadius: `${cornerRadius}px`,
               pointerEvents: "none",
-              transition: isDragging ? "none" : "all 0.2s ease-out",
+              transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
               opacity: isHovered ? 0.4 : isActive ? 0.8 : 0,
               backgroundImage:
                 "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100%)",
