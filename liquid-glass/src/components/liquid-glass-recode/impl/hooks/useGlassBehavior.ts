@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { utils } from "./utils";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import type { IGlassPosition, IGlassSize } from "../../types";
+import { constrainPosition, getPaddingValues } from "./utils";
 
-export interface GlassBehaviorOptions {
+export function useGlassBehavior({
+    width,
+    height,
+    padding = "24px 32px",
+    initialPosition,
+    draggable = true,
+    minWidth = 100,
+    minHeight = 50,
+    children
+}: {
     width?: number;
     height?: number;
     padding?: string;
@@ -9,43 +19,28 @@ export interface GlassBehaviorOptions {
     draggable?: boolean;
     minWidth?: number;
     minHeight?: number;
-    children?: React.ReactNode;
-}
-
-export interface GlassSize {
-    width: number;
-    height: number;
-}
-
-export interface GlassPosition {
-    x: number;
-    y: number;
-    centered: boolean;
-}
-
-export function useGlassBehavior({ width, height, padding = "24px 32px", initialPosition, draggable = true, minWidth = 100, minHeight = 50, children }: GlassBehaviorOptions) {
+    children?: ReactNode;
+}) {
     const measureRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [glassSize, setGlassSize] = useState<GlassSize>({
+    const [glassSize, setGlassSize] = useState<IGlassSize>({
         width: width ?? minWidth,
         height: height ?? minHeight,
     });
-    const [position, setPosition] = useState<GlassPosition>({
+    const [position, setPosition] = useState<IGlassPosition>({
         x: initialPosition?.x ?? 0,
         y: initialPosition?.y ?? 0,
-        centered: !initialPosition,
+        centered: !initialPosition || (initialPosition.x === undefined && initialPosition.y === undefined),
     });
     const [isDragging, setIsDragging] = useState(false);
     const [contentMeasured, setContentMeasured] = useState(false);
 
     const offset = 10; // Viewport boundary offset
 
-    // Use shared position constraint utility
-    const constrainPosition = useCallback((x: number, y: number) => utils.constrainPosition(x, y, glassSize.width, glassSize.height, offset), [glassSize.width, glassSize.height, offset]);
+    const constrainPos = useCallback((x: number, y: number) => constrainPosition(x, y, glassSize.width, glassSize.height, offset), [glassSize.width, glassSize.height, offset]);
 
-    // Update glass size based on content
     const updateGlassSize = useCallback(() => {
         if (!measureRef.current || !children) return;
 
@@ -54,7 +49,7 @@ export function useGlassBehavior({ width, height, padding = "24px 32px", initial
             if (!measureRef.current) return;
 
             const contentRect = measureRef.current.getBoundingClientRect();
-            const paddingValues = utils.getPaddingValues(padding);
+            const paddingValues = getPaddingValues(padding);
 
             // If width/height are explicitly provided, use them
             if (width && height) {
@@ -82,7 +77,6 @@ export function useGlassBehavior({ width, height, padding = "24px 32px", initial
         });
     }, [width, height, glassSize.width, glassSize.height, padding, children, minWidth, minHeight]);
 
-    // Handle drag functionality
     const handleMouseDown = useCallback(
         (e: React.MouseEvent) => {
             if (!draggable) return;
@@ -104,9 +98,20 @@ export function useGlassBehavior({ width, height, padding = "24px 32px", initial
 
             const startX = e.clientX;
             const startY = e.clientY;
-            const initialX = rect.left;
-            const initialY = rect.top;
-            let hasMoved = false;
+            
+            // Get initial position from current state or current element position
+            let initialX: number;
+            let initialY: number;
+            
+            if (position.centered) {
+                // For centered elements, use current screen position
+                initialX = rect.left;
+                initialY = rect.top;
+            } else {
+                // For already positioned elements, use state values
+                initialX = position.x;
+                initialY = position.y;
+            }
 
             const handleDragMove = (e: MouseEvent) => {
                 const deltaX = e.clientX - startX;
@@ -114,22 +119,10 @@ export function useGlassBehavior({ width, height, padding = "24px 32px", initial
 
                 // Only update position if there's actual movement
                 if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
-                    if (!hasMoved) {
-                        hasMoved = true;
-                        // First movement - switch from centered to absolute positioning
-                        if (position.centered) {
-                            setPosition({
-                                x: initialX,
-                                y: initialY,
-                                centered: false,
-                            });
-                        }
-                    }
-
                     const newX = initialX + deltaX;
                     const newY = initialY + deltaY;
 
-                    const constrained = constrainPosition(newX, newY);
+                    const constrained = constrainPos(newX, newY);
 
                     setPosition({
                         x: constrained.x,
@@ -150,7 +143,7 @@ export function useGlassBehavior({ width, height, padding = "24px 32px", initial
 
             e.preventDefault();
         },
-        [draggable, constrainPosition, position.centered],
+        [draggable, constrainPos, position.centered, position.x, position.y],
     );
 
     // Update glass size when width/height props change
@@ -208,7 +201,7 @@ export function useGlassBehavior({ width, height, padding = "24px 32px", initial
     useEffect(() => {
         const handleResize = () => {
             if (!position.centered) {
-                const constrained = constrainPosition(position.x, position.y);
+                const constrained = constrainPos(position.x, position.y);
                 if (position.x !== constrained.x || position.y !== constrained.y) {
                     setPosition({
                         x: constrained.x,
@@ -221,7 +214,7 @@ export function useGlassBehavior({ width, height, padding = "24px 32px", initial
 
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
-    }, [position, constrainPosition]);
+    }, [position, constrainPos]);
 
     // Invisible measuring div style for auto-sizing
     const measureStyle: React.CSSProperties = {
