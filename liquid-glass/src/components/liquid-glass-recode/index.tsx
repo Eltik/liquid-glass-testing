@@ -6,8 +6,8 @@ import { GlassContainer } from "./impl/components/glass-container";
 import type { Vec2 } from "./types";
 
 export function LiquidGlass({
-    width = 300,
-    height = 200,
+    width,
+    height,
     padding = "24px 32px",
     initialPosition = { x: 0, y: 0 },
     draggable = true,
@@ -183,34 +183,40 @@ export function LiquidGlass({
                 )}
 
                 {/* Over light effect */}
-                <div
-                    className={`pointer-events-none bg-black ${overLight ? "opacity-20" : "opacity-0"}`}
-                    style={{
-                        ...borderPositionStyles,
-                        height: glassSize.height,
-                        width: glassSize.width,
-                        borderRadius: `${cornerRadius}px`,
-                        pointerEvents: "none",
-                        transition: isDragging ? "none" : "transform 0.15s ease-in-out, opacity 0.15s ease-in-out",
-                        overflow: "hidden",
-                        clipPath: `inset(0 round ${cornerRadius}px)`,
-                        WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
-                    }}
-                />
-                <div
-                    className={`pointer-events-none bg-black ${overLight ? "opacity-100" : "opacity-0"}`}
-                    style={{
-                        ...borderPositionStyles,
-                        height: glassSize.height,
-                        width: glassSize.width,
-                        borderRadius: `${cornerRadius}px`,
-                        pointerEvents: "none",
-                        transition: isDragging ? "none" : "transform 0.15s ease-in-out, opacity 0.15s ease-in-out",
-                        overflow: "hidden",
-                        clipPath: `inset(0 round ${cornerRadius}px)`,
-                        WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
-                    }}
-                />
+                {overLight && (
+                    <div
+                        className="pointer-events-none bg-black opacity-20"
+                        style={{
+                            ...borderPositionStyles,
+                            height: glassSize.height,
+                            width: glassSize.width,
+                            borderRadius: `${cornerRadius}px`,
+                            pointerEvents: "none",
+                            transition: isDragging ? "none" : "transform 0.15s ease-in-out",
+                            overflow: "hidden",
+                            clipPath: `inset(0 round ${cornerRadius}px)`,
+                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            willChange: "transform",
+                        }}
+                    />
+                )}
+                {overLight && (
+                    <div
+                        className="pointer-events-none bg-black opacity-100"
+                        style={{
+                            ...borderPositionStyles,
+                            height: glassSize.height,
+                            width: glassSize.width,
+                            borderRadius: `${cornerRadius}px`,
+                            pointerEvents: "none",
+                            transition: isDragging ? "none" : "transform 0.15s ease-in-out",
+                            overflow: "hidden",
+                            clipPath: `inset(0 round ${cornerRadius}px)`,
+                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            willChange: "transform",
+                        }}
+                    />
+                )}
                 
                 {/* Glass container with effects */}
                 <GlassContainer
@@ -258,6 +264,8 @@ export function LiquidGlass({
                         overflow: "hidden",
                         clipPath: `inset(0 round ${cornerRadius}px)`,
                         WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                        willChange: "transform",
+                        transition: isDragging ? "none" : "transform 0.2s ease-out",
                     }}
                 >
                     <div style={{
@@ -285,6 +293,8 @@ export function LiquidGlass({
                         overflow: "hidden",
                         clipPath: `inset(0 round ${cornerRadius}px)`,
                         WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                        willChange: "transform",
+                        transition: isDragging ? "none" : "transform 0.2s ease-out",
                     }}
                 >
                     <div
@@ -301,53 +311,22 @@ export function LiquidGlass({
 
                 {/* Hover effects */}
                 {Boolean(onClick) && (
-                    <>
-                        <div
-                            style={{
-                                ...borderPositionStyles,
-                                height: glassSize.height,
-                                width: glassSize.width,
-                                borderRadius: `${cornerRadius}px`,
-                                pointerEvents: "none",
-                                transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
-                                opacity: isHovered || isActive ? 0.5 : 0,
-                                backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%)",
-                                overflow: "hidden",
-                                clipPath: `inset(0 round ${cornerRadius}px)`,
-                                WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
-                            }}
-                        />
-                        <div
-                            style={{
-                                ...borderPositionStyles,
-                                height: glassSize.height,
-                                width: glassSize.width,
-                                borderRadius: `${cornerRadius}px`,
-                                pointerEvents: "none",
-                                transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
-                                opacity: isActive ? 0.5 : 0,
-                                backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 80%)",
-                                overflow: "hidden",
-                                clipPath: `inset(0 round ${cornerRadius}px)`,
-                                WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
-                            }}
-                        />
-                        <div
-                            style={{
-                                ...borderPositionStyles,
-                                height: glassSize.height,
-                                width: glassSize.width,
-                                borderRadius: `${cornerRadius}px`,
-                                pointerEvents: "none",
-                                transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
-                                opacity: isHovered ? 0.4 : isActive ? 0.8 : 0,
-                                backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100%)",
-                                overflow: "hidden",
-                                clipPath: `inset(0 round ${cornerRadius}px)`,
-                                WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
-                            }}
-                        />
-                    </>
+                    <div
+                        style={{
+                            ...borderPositionStyles,
+                            height: glassSize.height,
+                            width: glassSize.width,
+                            borderRadius: `${cornerRadius}px`,
+                            pointerEvents: "none",
+                            transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
+                            opacity: isHovered ? 0.6 : isActive ? 0.8 : 0,
+                            backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%)",
+                            overflow: "hidden",
+                            clipPath: `inset(0 round ${cornerRadius}px)`,
+                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            willChange: "transform, opacity",
+                        }}
+                    />
                 )}
             </div>
         </>

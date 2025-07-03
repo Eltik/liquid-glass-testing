@@ -98,20 +98,9 @@ export function useGlassBehavior({
 
             const startX = e.clientX;
             const startY = e.clientY;
-            
-            // Get initial position from current state or current element position
-            let initialX: number;
-            let initialY: number;
-            
-            if (position.centered) {
-                // For centered elements, use current screen position
-                initialX = rect.left;
-                initialY = rect.top;
-            } else {
-                // For already positioned elements, use state values
-                initialX = position.x;
-                initialY = position.y;
-            }
+            const initialX = rect.left;
+            const initialY = rect.top;
+            let hasMoved = false;
 
             const handleDragMove = (e: MouseEvent) => {
                 const deltaX = e.clientX - startX;
@@ -119,6 +108,18 @@ export function useGlassBehavior({
 
                 // Only update position if there's actual movement
                 if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+                    if (!hasMoved) {
+                        hasMoved = true;
+                        // First movement - switch from centered to absolute positioning
+                        if (position.centered) {
+                            setPosition({
+                                x: initialX,
+                                y: initialY,
+                                centered: false,
+                            });
+                        }
+                    }
+
                     const newX = initialX + deltaX;
                     const newY = initialY + deltaY;
 
@@ -143,7 +144,7 @@ export function useGlassBehavior({
 
             e.preventDefault();
         },
-        [draggable, constrainPos, position.centered, position.x, position.y],
+        [draggable, constrainPos, position.centered],
     );
 
     // Update glass size when width/height props change

@@ -16,16 +16,14 @@ export default function Test() {
         cornerRadius: 16,
         displacementScale,
         className: "shadow-lg",
-    };
-
-    // Enhanced-specific props
-    const enhancedProps = {
         mode: displacementMode,
         aberrationIntensity,
         elasticity,
         blurAmount,
         saturation,
     };
+
+    const [activeTab, setActiveTab] = useState("home");
 
     return (
         <>
@@ -54,9 +52,29 @@ export default function Test() {
                     <img src="https://picsum.photos/1100/1200" className="my-10 mb-96 h-96 w-full object-cover" />
                 </div>
 
-                <LiquidGlass {...commonProps} {...enhancedProps} initialPosition={{ x: 50, y: 100 }} mouseContainer={mouseContainerRef}>
+                <LiquidGlass {...commonProps} initialPosition={{ x: 600, y: 350 }} mouseContainer={mouseContainerRef}>
                     <nav className="flex items-center space-x-6 text-white">
                         <div className="text-lg font-bold">Standard Glass</div>
+                        <div className="flex space-x-4">
+                            {["Home", "About", "Services", "Contact"].map((item) => (
+                                <button key={item} onClick={() => setActiveTab(item.toLowerCase())} className={`rounded-lg px-3 py-2 transition-all ${activeTab === item.toLowerCase() ? "bg-white/30 text-yellow-300" : "hover:bg-white/20"}`}>
+                                    {item}
+                                </button>
+                            ))}
+                        </div>
+                    </nav>
+                </LiquidGlass>
+
+                <LiquidGlass {...commonProps} initialPosition={{ x: 50, y: 100 }} mouseContainer={mouseContainerRef}>
+                    <nav className="flex items-center space-x-6 text-white">
+                        <div className="text-lg font-bold">Standard Glass</div>
+                        <div className="flex space-x-4">
+                            {["Home", "About", "Services", "Contact"].map((item) => (
+                                <button key={item} onClick={() => setActiveTab(item.toLowerCase())} className={`rounded-lg px-3 py-2 transition-all ${activeTab === item.toLowerCase() ? "bg-white/30 text-yellow-300" : "hover:bg-white/20"}`}>
+                                    {item}
+                                </button>
+                            ))}
+                        </div>
                     </nav>
                 </LiquidGlass>
             </main>

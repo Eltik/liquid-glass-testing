@@ -38,46 +38,67 @@ export const useMouseTracking = ({
         rafIdRef.current = requestAnimationFrame(() => {
                 rafIdRef.current = undefined;
 
-                const container = mouseContainer?.current ?? glassRef.current;
-                if (!container) {
+                if (!glassRef.current) {
                     return;
                 }
 
-                const rect = container.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
+                // Check distance from glass component first
+                const glassRect = glassRef.current.getBoundingClientRect();
+                const glassCenterX = glassRect.left + glassRect.width / 2;
+                const glassCenterY = glassRect.top + glassRect.height / 2;
+                
+                const deltaX = e.clientX - glassCenterX;
+                const deltaY = e.clientY - glassCenterY;
+                
+                const edgeDistanceX = Math.max(0, Math.abs(deltaX) - glassRect.width / 2);
+                const edgeDistanceY = Math.max(0, Math.abs(deltaY) - glassRect.height / 2);
+                const edgeDistance = Math.sqrt(edgeDistanceX * edgeDistanceX + edgeDistanceY * edgeDistanceY);
+                
+                const activationZone = 200;
+                
+                // Only update if mouse is within activation zone
+                if (edgeDistance <= activationZone) {
+                    const container = mouseContainer?.current ?? glassRef.current;
+                    if (!container) {
+                        return;
+                    }
 
-                const newMouseOffset = {
-                    x: ((e.clientX - centerX) / rect.width) * 100,
-                    y: ((e.clientY - centerY) / rect.height) * 100,
-                };
+                    const rect = container.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
 
-                const newGlobalMousePos = {
-                    x: e.clientX,
-                    y: e.clientY,
-                };
-
-                // Update gradient values for border effects using transform instead of background recalculation
-                if (!isDragging) {
-                    borderGradientRef.current = {
-                        angle: 135 + newMouseOffset.x * 1.2,
-                        opacity1: 0.12 + Math.abs(newMouseOffset.x) * 0.008,
-                        opacity2: 0.4 + Math.abs(newMouseOffset.x) * 0.012,
-                        stop1: Math.max(10, 33 + newMouseOffset.y * 0.3),
-                        stop2: Math.min(90, 66 + newMouseOffset.y * 0.4),
+                    const newMouseOffset = {
+                        x: ((e.clientX - centerX) / rect.width) * 100,
+                        y: ((e.clientY - centerY) / rect.height) * 100,
                     };
 
-                    overlayGradientRef.current = {
-                        angle: 135 + newMouseOffset.x * 1.2,
-                        opacity1: 0.32 + Math.abs(newMouseOffset.x) * 0.008,
-                        opacity2: 0.6 + Math.abs(newMouseOffset.x) * 0.012,
-                        stop1: Math.max(10, 33 + newMouseOffset.y * 0.3),
-                        stop2: Math.min(90, 66 + newMouseOffset.y * 0.4),
+                    const newGlobalMousePos = {
+                        x: e.clientX,
+                        y: e.clientY,
                     };
+
+                    // Update gradient values for border effects using transform instead of background recalculation
+                    if (!isDragging) {
+                        borderGradientRef.current = {
+                            angle: 135 + newMouseOffset.x * 1.2,
+                            opacity1: 0.12 + Math.abs(newMouseOffset.x) * 0.008,
+                            opacity2: 0.4 + Math.abs(newMouseOffset.x) * 0.012,
+                            stop1: Math.max(10, 33 + newMouseOffset.y * 0.3),
+                            stop2: Math.min(90, 66 + newMouseOffset.y * 0.4),
+                        };
+
+                        overlayGradientRef.current = {
+                            angle: 135 + newMouseOffset.x * 1.2,
+                            opacity1: 0.32 + Math.abs(newMouseOffset.x) * 0.008,
+                            opacity2: 0.6 + Math.abs(newMouseOffset.x) * 0.012,
+                            stop1: Math.max(10, 33 + newMouseOffset.y * 0.3),
+                            stop2: Math.min(90, 66 + newMouseOffset.y * 0.4),
+                        };
+                    }
+
+                    setInternalMouseOffset(newMouseOffset);
+                    setInternalGlobalMousePos(newGlobalMousePos);
                 }
-
-                setInternalMouseOffset(newMouseOffset);
-                setInternalGlobalMousePos(newGlobalMousePos);
             });
     }, [mouseContainer, isDragging, setInternalMouseOffset, setInternalGlobalMousePos, borderGradientRef, overlayGradientRef]);
 
