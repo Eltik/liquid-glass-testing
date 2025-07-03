@@ -1,7 +1,8 @@
-import { displacementCache } from "~/components/liquid-glass/impl/utils";
 import type { Vec2 } from "../../types";
 import { fragmentShaders } from "./fragment-shaders";
 import { createCanvasDataURL, createServerDataURL } from "./create-data-url";
+
+const displacementCache = new Map<string, string>();
 
 export const generateDisplacementMap = (type: "standard" | "polar" | "prominent", width = 256, height = 256): string => {
     const cacheKey = `${type}-${width}-${height}`;

@@ -26,7 +26,8 @@ export function LiquidGlass({
     saturation = 140,
     displacementScale = 25,
     aberrationIntensity = 2,
-    cornerRadius = 16
+    cornerRadius = 16,
+    border = true
 }: {
     width?: number;
     height?: number;
@@ -49,6 +50,7 @@ export function LiquidGlass({
     displacementScale?: number;
     aberrationIntensity?: number;
     cornerRadius?: number;
+    border?: boolean;
 }) {
     const glassRef = useRef<HTMLDivElement>(null);
     
@@ -183,7 +185,7 @@ export function LiquidGlass({
                 )}
 
                 {/* Over light effect */}
-                {overLight && (
+                {border && overLight && (
                     <div
                         className="pointer-events-none bg-black opacity-20"
                         style={{
@@ -200,7 +202,7 @@ export function LiquidGlass({
                         }}
                     />
                 )}
-                {overLight && (
+                {border && overLight && (
                     <div
                         className="pointer-events-none bg-black opacity-100"
                         style={{
@@ -250,67 +252,71 @@ export function LiquidGlass({
                 </GlassContainer>
 
                 {/* Border layer 1 - screen blend */}
-                <span className="border-layer-1" style={{
-                        ...containerStyle,
-                        zIndex: (containerStyle.zIndex as number) + 1,
-                        pointerEvents: "none",
-                        opacity: 0.2,
-                        padding: "1.5px",
-                        WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-                        WebkitMaskComposite: "xor",
-                        maskComposite: "exclude",
-                        boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-                        borderRadius: `${cornerRadius}px`,
-                        overflow: "hidden",
-                        clipPath: `inset(0 round ${cornerRadius}px)`,
-                        WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
-                        willChange: "transform",
-                        transition: isDragging ? "none" : "transform 0.2s ease-out",
-                    }}
-                >
-                    <div style={{
-                            position: "absolute",
-                            inset: 0,
+                {border && (
+                    <span className="border-layer-1" style={{
+                            ...containerStyle,
+                            zIndex: (containerStyle.zIndex as number) + 1,
+                            pointerEvents: "none",
+                            opacity: 0.2,
+                            padding: "1.5px",
+                            WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                            WebkitMaskComposite: "xor",
+                            maskComposite: "exclude",
+                            boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
                             borderRadius: `${cornerRadius}px`,
-                            backgroundImage: isDragging
-                                ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.4) 66%, rgba(255, 255, 255, 0.0) 100%)`
-                                : `linear-gradient(${borderGradientRef.current.angle}deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, ${borderGradientRef.current.opacity1}) ${borderGradientRef.current.stop1}%, rgba(255, 255, 255, ${borderGradientRef.current.opacity2}) ${borderGradientRef.current.stop2}%, rgba(255, 255, 255, 0.0) 100%)`,
+                            overflow: "hidden",
+                            clipPath: `inset(0 round ${cornerRadius}px)`,
+                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            willChange: "transform",
+                            transition: isDragging ? "none" : "transform 0.2s ease-out",
                         }}
-                    />
-                </span>
+                    >
+                        <div style={{
+                                position: "absolute",
+                                inset: 0,
+                                borderRadius: `${cornerRadius}px`,
+                                backgroundImage: isDragging
+                                    ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.4) 66%, rgba(255, 255, 255, 0.0) 100%)`
+                                    : `linear-gradient(${borderGradientRef.current.angle}deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, ${borderGradientRef.current.opacity1}) ${borderGradientRef.current.stop1}%, rgba(255, 255, 255, ${borderGradientRef.current.opacity2}) ${borderGradientRef.current.stop2}%, rgba(255, 255, 255, 0.0) 100%)`,
+                            }}
+                        />
+                    </span>
+                )}
 
                 {/* Border layer 2 - overlay blend */}
-                <span className="border-layer-2" style={{
-                        ...containerStyle,
-                        zIndex: (containerStyle.zIndex as number) + 2,
-                        pointerEvents: "none",
-                        padding: "1.5px",
-                        WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-                        WebkitMaskComposite: "xor",
-                        maskComposite: "exclude",
-                        boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-                        borderRadius: `${cornerRadius}px`,
-                        overflow: "hidden",
-                        clipPath: `inset(0 round ${cornerRadius}px)`,
-                        WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
-                        willChange: "transform",
-                        transition: isDragging ? "none" : "transform 0.2s ease-out",
-                    }}
-                >
-                    <div
-                        style={{
-                            position: "absolute",
-                            inset: 0,
+                {border && (
+                    <span className="border-layer-2" style={{
+                            ...containerStyle,
+                            zIndex: (containerStyle.zIndex as number) + 2,
+                            pointerEvents: "none",
+                            padding: "1.5px",
+                            WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                            WebkitMaskComposite: "xor",
+                            maskComposite: "exclude",
+                            boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
                             borderRadius: `${cornerRadius}px`,
-                            backgroundImage: isDragging
-                                ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.32) 33%, rgba(255, 255, 255, 0.6) 66%, rgba(255, 255, 255, 0.0) 100%)`
-                                : `linear-gradient(${overlayGradientRef.current.angle}deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, ${overlayGradientRef.current.opacity1}) ${overlayGradientRef.current.stop1}%, rgba(255, 255, 255, ${overlayGradientRef.current.opacity2}) ${overlayGradientRef.current.stop2}%, rgba(255, 255, 255, 0.0) 100%)`,
+                            overflow: "hidden",
+                            clipPath: `inset(0 round ${cornerRadius}px)`,
+                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            willChange: "transform",
+                            transition: isDragging ? "none" : "transform 0.2s ease-out",
                         }}
-                    />
-                </span>
+                    >
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                borderRadius: `${cornerRadius}px`,
+                                backgroundImage: isDragging
+                                    ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.32) 33%, rgba(255, 255, 255, 0.6) 66%, rgba(255, 255, 255, 0.0) 100%)`
+                                    : `linear-gradient(${overlayGradientRef.current.angle}deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, ${overlayGradientRef.current.opacity1}) ${overlayGradientRef.current.stop1}%, rgba(255, 255, 255, ${overlayGradientRef.current.opacity2}) ${overlayGradientRef.current.stop2}%, rgba(255, 255, 255, 0.0) 100%)`,
+                            }}
+                        />
+                    </span>
+                )}
 
                 {/* Hover effects */}
-                {Boolean(onClick) && (
+                {border && Boolean(onClick) && (
                     <div
                         style={{
                             ...borderPositionStyles,
