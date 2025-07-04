@@ -36,17 +36,18 @@ export function GlassFilter({ id, width, height, mode, aberrationIntensity, disp
                         {/* Original undisplaced image for center */}
                         <feOffset in="SourceGraphic" dx="0" dy="0" result="CENTER_ORIGINAL" />
 
-                        {/* Red channel displacement with slight offset */}
-                        <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * -1} xChannelSelector="R" yChannelSelector="B" result="RED_DISPLACED" />
-                        <feColorMatrix in="RED_DISPLACED" type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="RED_CHANNEL" />
-
-                        {/* Green channel displacement */}
-                        <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * (-1 - aberrationIntensity * 0.05)} xChannelSelector="R" yChannelSelector="B" result="GREEN_DISPLACED" />
-                        <feColorMatrix in="GREEN_DISPLACED" type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="GREEN_CHANNEL" />
-
-                        {/* Blue channel displacement with slight offset */}
-                        <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * (-1 - aberrationIntensity * 0.1)} xChannelSelector="R" yChannelSelector="B" result="BLUE_DISPLACED" />
-                        <feColorMatrix in="BLUE_DISPLACED" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="BLUE_CHANNEL" />
+                        {/* Single displacement map with moderate scale for base effect */}
+                        <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * (-1 - aberrationIntensity * 0.05)} xChannelSelector="R" yChannelSelector="B" result="BASE_DISPLACED" />
+                        
+                        {/* Create chromatic aberration by offsetting color channels */}
+                        <feOffset in="BASE_DISPLACED" dx={aberrationIntensity * 0.5} dy={aberrationIntensity * 0.2} result="RED_OFFSET" />
+                        <feColorMatrix in="RED_OFFSET" type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="RED_CHANNEL" />
+                        
+                        <feOffset in="BASE_DISPLACED" dx={0} dy={0} result="GREEN_OFFSET" />
+                        <feColorMatrix in="GREEN_OFFSET" type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="GREEN_CHANNEL" />
+                        
+                        <feOffset in="BASE_DISPLACED" dx={-aberrationIntensity * 0.5} dy={-aberrationIntensity * 0.2} result="BLUE_OFFSET" />
+                        <feColorMatrix in="BLUE_OFFSET" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="BLUE_CHANNEL" />
 
                         {/* Combine all channels with screen blend mode for chromatic aberration */}
                         <feBlend in="GREEN_CHANNEL" in2="BLUE_CHANNEL" mode="screen" result="GB_COMBINED" />
