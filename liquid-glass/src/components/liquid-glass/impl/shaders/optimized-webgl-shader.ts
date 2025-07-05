@@ -22,15 +22,19 @@ void main() {
 }
 `;
 
-// Merged displacement map fragment shader - samples from pre-computed texture
+// Optimized fragment shader with consolidated displacement and chromatic aberration
 const FRAGMENT_SHADER = `
-precision lowp float;
+precision mediump float;
 varying vec2 v_texCoord;
 
+// Source texture (the content being displaced)
+uniform sampler2D u_sourceTexture;
 // Merged displacement texture containing all modes
 uniform sampler2D u_mergedDisplacementMap;
 // Control uniforms
 uniform float u_mode; // 0.0=standard, 1.0=polar, 2.0=prominent
+uniform float u_displacementScale;
+uniform float u_aberrationIntensity;
 
 void main() {
     vec2 uv = v_texCoord;
@@ -41,15 +45,27 @@ void main() {
     vec2 sampleUV = vec2(uv.x / 3.0 + modeOffset, uv.y);
     
     // Sample the pre-computed displacement
-    vec4 displacement = texture2D(u_mergedDisplacementMap, sampleUV);
+    vec2 displacement = texture2D(u_mergedDisplacementMap, sampleUV).xy;
+    displacement = (displacement - 0.5) * u_displacementScale;
     
-    gl_FragColor = displacement;
+    // Single-pass chromatic aberration with displacement
+    vec2 redUV = uv + displacement + vec2(u_aberrationIntensity * 0.002, u_aberrationIntensity * 0.001);
+    vec2 greenUV = uv + displacement;
+    vec2 blueUV = uv + displacement - vec2(u_aberrationIntensity * 0.002, u_aberrationIntensity * 0.001);
+    
+    // Sample RGB channels with different UVs for chromatic aberration
+    float r = texture2D(u_sourceTexture, redUV).r;
+    float g = texture2D(u_sourceTexture, greenUV).g;
+    float b = texture2D(u_sourceTexture, blueUV).b;
+    float a = texture2D(u_sourceTexture, greenUV).a;
+    
+    gl_FragColor = vec4(r, g, b, a);
 }
 `;
 
 // WebGL shader compilation and setup utilities
 class OptimizedLiquidGlassShader {
-    private gl: WebGLRenderingContext;
+    public gl: WebGLRenderingContext;
     private program: WebGLProgram;
     private frameBuffer: WebGLFramebuffer;
     private outputTexture: WebGLTexture;
@@ -59,8 +75,11 @@ class OptimizedLiquidGlassShader {
     
     // Cached uniform locations
     private uniforms: {
+        sourceTexture: WebGLUniformLocation;
         mergedDisplacementMap: WebGLUniformLocation;
         mode: WebGLUniformLocation;
+        displacementScale: WebGLUniformLocation;
+        aberrationIntensity: WebGLUniformLocation;
     };
     
     constructor(canvas: HTMLCanvasElement) {
@@ -83,8 +102,11 @@ class OptimizedLiquidGlassShader {
         
         // Cache uniform locations
         this.uniforms = {
+            sourceTexture: gl.getUniformLocation(this.program, 'u_sourceTexture')!,
             mergedDisplacementMap: gl.getUniformLocation(this.program, 'u_mergedDisplacementMap')!,
             mode: gl.getUniformLocation(this.program, 'u_mode')!,
+            displacementScale: gl.getUniformLocation(this.program, 'u_displacementScale')!,
+            aberrationIntensity: gl.getUniformLocation(this.program, 'u_aberrationIntensity')!,
         };
     }
     
@@ -144,10 +166,10 @@ class OptimizedLiquidGlassShader {
         
         gl.bindTexture(gl.TEXTURE_2D, texture);
         
-        // Create merged displacement map data (768x256: 3 modes side by side)
+        // Create merged displacement map data (384x128: 3 modes side by side, reduced size)
         const mergedData = this.generateMergedDisplacementData();
         
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 768, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, mergedData);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 384, 128, 0, gl.RGB, gl.UNSIGNED_BYTE, mergedData);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -157,21 +179,21 @@ class OptimizedLiquidGlassShader {
     }
     
     private generateMergedDisplacementData(): Uint8Array {
-        const width = 768; // 3 modes × 256 width each
-        const height = 256;
-        const data = new Uint8Array(width * height * 4);
+        const width = 384; // 3 modes × 128 width each
+        const height = 128;
+        const data = new Uint8Array(width * height * 3); // RGB format for better performance
         
         // Generate displacement maps for all three modes side by side
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                const idx = (y * width + x) * 4;
+                const idx = (y * width + x) * 3;
                 
                 // Determine which mode section we're in
-                const modeSection = Math.floor(x / 256); // 0=standard, 1=polar, 2=prominent
-                const localX = x % 256; // Local x within the 256x256 section
+                const modeSection = Math.floor(x / 128); // 0=standard, 1=polar, 2=prominent
+                const localX = x % 128; // Local x within the 128x128 section
                 
                 // UV coordinates for the local section
-                const uv = { x: localX / 256, y: y / 256 };
+                const uv = { x: localX / 128, y: y / 128 };
                 const center = { x: uv.x - 0.5, y: uv.y - 0.5 };
                 const distSq = center.x * center.x + center.y * center.y;
                 
@@ -213,11 +235,10 @@ class OptimizedLiquidGlassShader {
                 const normalizedX = displacement.x * 0.5 + 0.5;
                 const normalizedY = displacement.y * 0.5 + 0.5;
                 
-                // Store in RGBA format
+                // Store in RGB format (more memory efficient)
                 data[idx] = Math.floor(Math.max(0, Math.min(1, normalizedX)) * 255);     // R
                 data[idx + 1] = Math.floor(Math.max(0, Math.min(1, normalizedY)) * 255); // G
                 data[idx + 2] = Math.floor(Math.max(0, Math.min(1, normalizedY)) * 255); // B (same as G for displacement map)
-                data[idx + 3] = 255; // A
             }
         }
         
@@ -245,7 +266,7 @@ class OptimizedLiquidGlassShader {
         }
         
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 128, 128, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -291,34 +312,41 @@ class OptimizedLiquidGlassShader {
     }
     
     /**
-     * Render displacement map from merged texture
+     * Render liquid glass effect directly to canvas - eliminates GPU-CPU sync
      */
-    public render(params: {
+    public renderDirectToCanvas(params: {
         mode: 'standard' | 'polar' | 'prominent';
-    }): string {
+        displacementScale: number;
+        aberrationIntensity: number;
+        sourceTexture: WebGLTexture;
+    }): void {
         const gl = this.gl;
         
-        // Bind framebuffer for off-screen rendering
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.outputTexture, 0);
+        // Render directly to main canvas (no framebuffer)
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         
-        // Set viewport
-        gl.viewport(0, 0, 256, 256);
-        
-        // Clear
-        gl.clearColor(0.5, 0.5, 0.5, 1.0); // Neutral displacement
+        // Clear canvas
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         
         // Use shader program
         gl.useProgram(this.program);
         
-        // Bind merged displacement texture
+        // Bind source texture (content to be displaced)
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.mergedDisplacementTexture);
-        gl.uniform1i(this.uniforms.mergedDisplacementMap, 0);
+        gl.bindTexture(gl.TEXTURE_2D, params.sourceTexture);
+        gl.uniform1i(this.uniforms.sourceTexture, 0);
         
-        // Set mode uniform
+        // Bind merged displacement texture
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.mergedDisplacementTexture);
+        gl.uniform1i(this.uniforms.mergedDisplacementMap, 1);
+        
+        // Set uniforms
         gl.uniform1f(this.uniforms.mode, params.mode === 'standard' ? 0.0 : params.mode === 'polar' ? 1.0 : 2.0);
+        gl.uniform1f(this.uniforms.displacementScale, params.displacementScale);
+        gl.uniform1f(this.uniforms.aberrationIntensity, params.aberrationIntensity);
         
         // Setup vertex attributes
         const positionLocation = gl.getAttribLocation(this.program, 'a_position');
@@ -334,15 +362,32 @@ class OptimizedLiquidGlassShader {
         gl.enableVertexAttribArray(texCoordLocation);
         gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
         
-        // Draw
+        // Draw directly to canvas (no GPU-CPU sync)
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         
-        // Read back texture data and convert to data URL
-        const pixels = new Uint8Array(256 * 256 * 4);
-        gl.readPixels(0, 0, 256, 256, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        // Flush to ensure rendering is complete
+        gl.flush();
+    }
+
+    /**
+     * Create texture from HTML element for source content
+     */
+    public createTextureFromElement(element: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement): WebGLTexture {
+        const gl = this.gl;
+        const texture = gl.createTexture();
         
-        // Convert to data URL for SVG filter consumption
-        return this.createDataURLFromPixels(pixels);
+        if (!texture) {
+            throw new Error('Failed to create texture');
+        }
+        
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, element);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        
+        return texture;
     }
     
     private createDataURLFromPixels(pixels: Uint8Array): string {
@@ -380,103 +425,15 @@ class OptimizedLiquidGlassShader {
 // Replacement for existing displacement map generation
 // This maintains the same API but uses a single merged displacement texture
 
-// Single merged displacement map instance shared across all modes
-let mergedDisplacementMapInstance: string | null = null;
-
-// Create a single merged displacement map containing all three modes
-const createSingleMergedDisplacementMap = (): string => {
-    if (mergedDisplacementMapInstance) {
-        return mergedDisplacementMapInstance;
-    }
-
-    console.log("Creating single merged displacement map containing all modes");
-
-    const canvas = document.createElement('canvas');
-    const totalWidth = 768; // 3 modes × 256 width each
-    const height = 256;
-    
-    canvas.width = totalWidth;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-        throw new Error('Failed to get 2D context for merged displacement map');
-    }
-    
-    const imageData = ctx.createImageData(totalWidth, height);
-    const data = imageData.data;
-    
-    // Generate all three displacement modes side by side
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < totalWidth; x++) {
-            const idx = (y * totalWidth + x) * 4;
-            
-            // Determine which mode section we're in
-            const modeSection = Math.floor(x / 256); // 0=standard, 1=polar, 2=prominent
-            const localX = x % 256; // Local x within the 256x256 section
-            
-            // UV coordinates for the local section
-            const uv = { x: localX / 256, y: y / 256 };
-            const center = { x: uv.x - 0.5, y: uv.y - 0.5 };
-            const distSq = center.x * center.x + center.y * center.y;
-            
-            const displacement = { x: 0, y: 0 };
-            
-            // Calculate displacement based on mode section
-            switch (modeSection) {
-                case 0: // Standard mode - barrel distortion
-                    {
-                        const distortion = 1.0 + distSq * 0.3;
-                        displacement.x = center.x * distortion;
-                        displacement.y = center.y * distortion;
-                    }
-                    break;
-                case 1: // Polar mode - radial effect
-                    {
-                        const dist = Math.sqrt(distSq);
-                        const angle = Math.atan2(center.y, center.x);
-                        const newRadius = dist * 1.2;
-                        displacement.x = Math.cos(angle) * newRadius;
-                        displacement.y = Math.sin(angle) * newRadius;
-                    }
-                    break;
-                case 2: // Prominent mode - wave pattern
-                    {
-                        const wave = Math.sin(uv.x * 12.566) * Math.sin(uv.y * 12.566) * 0.1;
-                        displacement.x = center.x * (1.0 + wave);
-                        displacement.y = center.y * (1.0 + wave);
-                    }
-                    break;
-            }
-            
-            // Apply edge falloff
-            const edgeFactor = 1.0 - Math.max(0, Math.min(1, (Math.sqrt(distSq) - 0.3) / 0.2));
-            displacement.x *= edgeFactor;
-            displacement.y *= edgeFactor;
-            
-            // Normalize displacement to [0,1] range for texture encoding
-            const normalizedX = displacement.x * 0.5 + 0.5;
-            const normalizedY = displacement.y * 0.5 + 0.5;
-            
-            // Store in RGBA format
-            data[idx] = Math.floor(Math.max(0, Math.min(1, normalizedX)) * 255);     // R
-            data[idx + 1] = Math.floor(Math.max(0, Math.min(1, normalizedY)) * 255); // G
-            data[idx + 2] = Math.floor(Math.max(0, Math.min(1, normalizedY)) * 255); // B
-            data[idx + 3] = 255; // A
-        }
-    }
-    
-    // Put the image data to canvas and convert to data URL
-    ctx.putImageData(imageData, 0, 0);
-    mergedDisplacementMapInstance = canvas.toDataURL();
-    
-    console.log("Single merged displacement map created successfully");
-    return mergedDisplacementMapInstance;
-};
+// Optimized texture size for better performance
+// const DISPLACEMENT_TEXTURE_SIZE = 128; // Reduced from 256 for better performance
 
 
 // Cache for individual extracted modes
 const extractedModeCache = new Map<string, string>();
+
+// Global WebGL shader instance for direct rendering
+let globalShaderInstance: OptimizedLiquidGlassShader | null = null;
 
 export const generateOptimizedDisplacementMap = (
     type: "standard" | "polar" | "prominent",
@@ -500,9 +457,6 @@ export const generateOptimizedDisplacementMap = (
             throw new Error('WebGL requires browser environment');
         }
         
-        // Create the single merged displacement map if it doesn't exist
-        createSingleMergedDisplacementMap();
-        
         // Create the mode-specific map directly (more efficient than extracting)
         const modeData = createModeSpecificMap(type, width, height);
         
@@ -520,6 +474,19 @@ export const generateOptimizedDisplacementMap = (
         const { generateDisplacementMap } = require('./generate-displacement-map') as { generateDisplacementMap: (type: string, width: number, height: number) => string };
         return generateDisplacementMap(type, width, height);
     }
+};
+
+/**
+ * Get or create the global WebGL shader instance for direct rendering
+ */
+export const getGlobalShaderInstance = (): OptimizedLiquidGlassShader => {
+    if (!globalShaderInstance) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        globalShaderInstance = new OptimizedLiquidGlassShader(canvas);
+    }
+    return globalShaderInstance;
 };
 
 // Create mode-specific displacement map directly
