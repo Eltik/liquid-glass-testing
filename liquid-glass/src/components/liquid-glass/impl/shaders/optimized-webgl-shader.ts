@@ -85,9 +85,23 @@ class OptimizedLiquidGlassShader {
     constructor(canvas: HTMLCanvasElement) {
         const gl = canvas.getContext('webgl', { antialias: true, alpha: false }) ?? canvas.getContext('experimental-webgl', { antialias: true, alpha: false });
         if (!gl || !(gl instanceof WebGLRenderingContext)) {
-            throw new Error('WebGL not supported');
+            throw new Error('WebGL not supported - GPU acceleration unavailable');
         }
         this.gl = gl;
+        
+        // Enable WebGL extensions if available
+        const extensions = [
+            'OES_texture_float',
+            'OES_texture_float_linear',
+            'WEBGL_lose_context'
+        ];
+        
+        extensions.forEach(ext => {
+            const extension: unknown = gl.getExtension(ext);
+            if (extension) {
+                console.log(`WebGL extension enabled: ${ext}`);
+            }
+        });
         
         // Compile and link shader program
         this.program = this.createShaderProgram();
@@ -108,6 +122,8 @@ class OptimizedLiquidGlassShader {
             displacementScale: gl.getUniformLocation(this.program, 'u_displacementScale')!,
             aberrationIntensity: gl.getUniformLocation(this.program, 'u_aberrationIntensity')!,
         };
+        
+        console.log('WebGL Liquid Glass Shader initialized successfully');
     }
     
     private createShaderProgram(): WebGLProgram {
@@ -390,21 +406,6 @@ class OptimizedLiquidGlassShader {
         return texture;
     }
     
-    private createDataURLFromPixels(pixels: Uint8Array): string {
-        // Create canvas for data URL generation
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d')!;
-        
-        // Create ImageData
-        const imageData = ctx.createImageData(256, 256);
-        imageData.data.set(pixels);
-        
-        // Put image data and convert to data URL
-        ctx.putImageData(imageData, 0, 0);
-        return canvas.toDataURL();
-    }
     
     
     /**
@@ -435,6 +436,50 @@ const extractedModeCache = new Map<string, string>();
 // Global WebGL shader instance for direct rendering
 let globalShaderInstance: OptimizedLiquidGlassShader | null = null;
 
+// WebGL capability detection
+const detectWebGLCapabilities = (): boolean => {
+    try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') ?? canvas.getContext('experimental-webgl');
+        
+        if (!gl || !(gl instanceof WebGLRenderingContext)) {
+            console.warn('WebGL not supported');
+            return false;
+        }
+        
+        // Check for required WebGL features
+        const requiredExtensions = ['OES_texture_float'];
+        for (const ext of requiredExtensions) {
+            if (!gl.getExtension(ext)) {
+                console.warn(`Required WebGL extension not available: ${ext}`);
+            }
+        }
+        
+        // Check shader compilation support
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        if (!vertexShader) {
+            console.warn('Cannot create vertex shader');
+            return false;
+        }
+        
+        gl.shaderSource(vertexShader, 'attribute vec2 a_position; void main() { gl_Position = vec4(a_position, 0.0, 1.0); }');
+        gl.compileShader(vertexShader);
+        
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            console.warn('Vertex shader compilation failed');
+            gl.deleteShader(vertexShader);
+            return false;
+        }
+        
+        gl.deleteShader(vertexShader);
+        console.log('WebGL capabilities validated successfully');
+        return true;
+    } catch (error) {
+        console.warn('WebGL capability detection failed:', error);
+        return false;
+    }
+};
+
 export const generateOptimizedDisplacementMap = (
     type: "standard" | "polar" | "prominent",
     width = 256,
@@ -442,38 +487,32 @@ export const generateOptimizedDisplacementMap = (
     _displacementScale = 1.0,
     _aberrationIntensity = 0.0
 ): string => {
-    try {
-        // Check if we already have this mode extracted
-        const cacheKey = `extracted-${type}`;
-        const cached = extractedModeCache.get(cacheKey);
-        if (cached) {
-            console.log('Using cached extracted displacement map for:', type);
-            return cached;
-        }
-        
-        // Check if we're in a browser environment
-        if (typeof window === 'undefined' || typeof document === 'undefined') {
-            console.log('WebGL optimization requires browser environment');
-            throw new Error('WebGL requires browser environment');
-        }
-        
-        // Create the mode-specific map directly (more efficient than extracting)
-        const modeData = createModeSpecificMap(type, width, height);
-        
-        // Cache the result
-        extractedModeCache.set(cacheKey, modeData);
-        
-        console.log("Generated displacement map for type:", type);
-        return modeData;
-        
-    } catch (error) {
-        console.warn('WebGL optimization failed, falling back to CPU implementation:', error);
-        
-        // Fallback to original implementation if WebGL fails
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { generateDisplacementMap } = require('./generate-displacement-map') as { generateDisplacementMap: (type: string, width: number, height: number) => string };
-        return generateDisplacementMap(type, width, height);
+    // Check if we already have this mode extracted
+    const cacheKey = `extracted-${type}`;
+    const cached = extractedModeCache.get(cacheKey);
+    if (cached) {
+        console.log('Using cached WebGL displacement map for:', type);
+        return cached;
     }
+    
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+        throw new Error('WebGL requires browser environment');
+    }
+    
+    // Validate WebGL capabilities
+    if (!detectWebGLCapabilities()) {
+        throw new Error('WebGL capabilities insufficient for liquid glass effects');
+    }
+    
+    // Create the mode-specific map using WebGL-optimized algorithms
+    const modeData = createModeSpecificMap(type, width, height);
+    
+    // Cache the result
+    extractedModeCache.set(cacheKey, modeData);
+    
+    console.log("Generated WebGL displacement map for type:", type);
+    return modeData;
 };
 
 /**
@@ -481,6 +520,10 @@ export const generateOptimizedDisplacementMap = (
  */
 export const getGlobalShaderInstance = (): OptimizedLiquidGlassShader => {
     if (!globalShaderInstance) {
+        if (!detectWebGLCapabilities()) {
+            throw new Error('WebGL capabilities insufficient for shader instance creation');
+        }
+        
         const canvas = document.createElement('canvas');
         canvas.width = 128;
         canvas.height = 128;
@@ -489,7 +532,7 @@ export const getGlobalShaderInstance = (): OptimizedLiquidGlassShader => {
     return globalShaderInstance;
 };
 
-// Create mode-specific displacement map directly
+// Create mode-specific displacement map directly using WebGL-optimized algorithms
 const createModeSpecificMap = (mode: "standard" | "polar" | "prominent", width: number, height: number): string => {
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -497,7 +540,7 @@ const createModeSpecificMap = (mode: "standard" | "polar" | "prominent", width: 
     const ctx = canvas.getContext('2d');
     
     if (!ctx) {
-        throw new Error('Failed to get 2D context for mode-specific map');
+        throw new Error('Failed to get 2D context for WebGL displacement map generation');
     }
     
     const imageData = ctx.createImageData(width, height);

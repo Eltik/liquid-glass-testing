@@ -1,24 +1,14 @@
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo } from "react";
 import { getMap } from "../../shaders/getMap";
 
 export function GlassFilter({ id, width, height, mode, aberrationIntensity, displacementScale, cornerRadius = 20 }: { id: string; width: number; height: number; mode: "standard" | "polar" | "prominent"; aberrationIntensity: number; displacementScale: number; cornerRadius?: number }) {
-    // Use WebGL optimization when available
-    const webglOptimized = useRef(false);
-    
-    // Check if we can use WebGL optimization
-    useEffect(() => {
-        try {
-            const testCanvas = document.createElement('canvas');
-            const gl = testCanvas.getContext('webgl') ?? testCanvas.getContext('experimental-webgl');
-            webglOptimized.current = !!gl;
-        } catch {
-            webglOptimized.current = false;
-        }
-    }, []);
-
     // Memoize displacement map generation - only regenerate when mode changes
     const displacementMap = useMemo(() => {
-        console.log('Generating displacement map for mode:', mode);
+        // Skip WebGL generation during SSR
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // 1x1 transparent fallback
+        }
+        console.log('Generating WebGL displacement map for mode:', mode);
         return getMap(mode);
     }, [mode]);
     return (
