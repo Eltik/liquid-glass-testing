@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useGlassBehavior } from "./impl/hooks/useGlassBehavior";
 import { useMouseTracking } from "./impl/hooks/useMouseTracking";
 import { useElasticEffects } from "./impl/hooks/useElasticEffects";
@@ -53,6 +53,8 @@ export function LiquidGlass({
     border?: boolean;
 }) {
     const glassRef = useRef<HTMLDivElement>(null);
+    const cssVarsRef = useRef<Record<string, string>>({});
+    const rafUpdateRef = useRef<number | undefined>(undefined);
     
     const [isHovered, setIsHovered] = useState(false);
     const [isActive, setIsActive] = useState(false);
@@ -79,6 +81,32 @@ export function LiquidGlass({
 
     const globalMousePos = externalGlobalMousePos ?? internalGlobalMousePos;
     const mouseOffset = externalMouseOffset ?? internalMouseOffset;
+
+    // CSS variables update function
+    const updateCSSVariables = useCallback((vars: Record<string, string>) => {
+        const element = glassRef.current;
+        if (!element) return;
+        
+        // Only update changed variables
+        Object.entries(vars).forEach(([key, value]) => {
+            if (cssVarsRef.current[key] !== value) {
+                element.style.setProperty(key, value);
+                cssVarsRef.current[key] = value;
+            }
+        });
+    }, []);
+
+    // RAF-based style updates
+    const scheduleStyleUpdate = useCallback((vars: Record<string, string>) => {
+        if (rafUpdateRef.current !== undefined) {
+            cancelAnimationFrame(rafUpdateRef.current);
+        }
+        
+        rafUpdateRef.current = requestAnimationFrame(() => {
+            updateCSSVariables(vars);
+            rafUpdateRef.current = undefined;
+        });
+    }, [updateCSSVariables]);
 
     const borderGradientRef = useRef({
         angle: 135,
@@ -136,42 +164,76 @@ export function LiquidGlass({
                 cancelAnimationFrame(rafIdRef.current);
                 rafIdRef.current = undefined;
             }
+            if (rafUpdateRef.current !== undefined) {
+                cancelAnimationFrame(rafUpdateRef.current);
+                rafUpdateRef.current = undefined;
+            }
         };
     }, [handleMouseMove, mouseContainer, externalGlobalMousePos, externalMouseOffset, rafIdRef]);
 
-    const elasticTranslation = isDragging ? { x: 0, y: 0 } : calculateElasticTranslation(glassRef);
-    const directionalScale = isDragging ? "scale(1)" : isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale(glassRef);
+    // Update CSS variables for transforms and other dynamic values
+    useEffect(() => {
+        const elasticTranslation = isDragging ? { x: 0, y: 0 } : calculateElasticTranslation(glassRef);
+        const directionalScale = isDragging ? "scale(1)" : isActive && Boolean(onClick) ? "scale(0.96)" : calculateDirectionalScale(glassRef);
+        
+        const vars: Record<string, string> = {
+            '--liquid-glass-translate-x': `${elasticTranslation.x}px`,
+            '--liquid-glass-translate-y': `${elasticTranslation.y}px`,
+            '--liquid-glass-pos-x': `${position.x}px`,
+            '--liquid-glass-pos-y': `${position.y}px`,
+            '--liquid-glass-width': `${glassSize.width}px`,
+            '--liquid-glass-height': `${glassSize.height}px`,
+            '--liquid-glass-corner-radius': `${cornerRadius}px`,
+            '--liquid-glass-gradient-angle': `${borderGradientRef.current.angle}deg`,
+            '--liquid-glass-border-opacity1': `${borderGradientRef.current.opacity1}`,
+            '--liquid-glass-border-opacity2': `${borderGradientRef.current.opacity2}`,
+            '--liquid-glass-border-stop1': `${borderGradientRef.current.stop1}%`,
+            '--liquid-glass-border-stop2': `${borderGradientRef.current.stop2}%`,
+            '--liquid-glass-overlay-opacity1': `${overlayGradientRef.current.opacity1}`,
+            '--liquid-glass-overlay-opacity2': `${overlayGradientRef.current.opacity2}`,
+            '--liquid-glass-overlay-stop1': `${overlayGradientRef.current.stop1}%`,
+            '--liquid-glass-overlay-stop2': `${overlayGradientRef.current.stop2}%`,
+            '--liquid-glass-hover-opacity': isHovered ? '0.6' : isActive ? '0.8' : '0',
+            '--liquid-glass-cursor': draggable ? (isDragging ? "grabbing" : "grab") : "default",
+            '--liquid-glass-transition': isDragging ? "none" : "transform 0.15s ease-in-out",
+        };
+        
+        // Parse scale values
+        const scaleRegex = /scaleX\(([^)]+)\)\s*scaleY\(([^)]+)\)/;
+        const scaleMatch = scaleRegex.exec(directionalScale);
+        if (scaleMatch) {
+            vars['--liquid-glass-scale-x'] = scaleMatch[1] ?? '1';
+            vars['--liquid-glass-scale-y'] = scaleMatch[2] ?? '1';
+        } else {
+            vars['--liquid-glass-scale-x'] = '1';
+            vars['--liquid-glass-scale-y'] = '1';
+        }
+        
+        scheduleStyleUpdate(vars);
+    }, [calculateElasticTranslation, calculateDirectionalScale, position, glassSize, cornerRadius, isHovered, isActive, isDragging, draggable, scheduleStyleUpdate, onClick]);
 
-    const transformStyle = position.centered ? `translate3d(calc(-50% + ${elasticTranslation.x}px), calc(-50% + ${elasticTranslation.y}px), 0) ${directionalScale}` : `translate3d(${elasticTranslation.x}px, ${elasticTranslation.y}px, 0) ${directionalScale}`;
-
-    const borderPositionStyles: React.CSSProperties = position.centered
-        ? {
-              position: "fixed",
-              transform: transformStyle.replace("translate3d(calc(-50% + ", "translate3d(calc(50vw - 50% + ").replace("), calc(-50% + ", "), calc(50vh - 50% + "),
-              zIndex: 10000,
-          }
-        : {
-              position: "fixed",
-              transform: isDragging ? `translate3d(${position.x}px, ${position.y}px, 0)` : `translate3d(${position.x + elasticTranslation.x}px, ${position.y + elasticTranslation.y}px, 0) ${directionalScale}`,
-              zIndex: 10000,
-          };
+    const borderPositionStyles: React.CSSProperties = {
+        position: "fixed",
+        transform: position.centered 
+            ? 'translate3d(calc(50vw - 50% + var(--liquid-glass-translate-x)), calc(50vh - 50% + var(--liquid-glass-translate-y)), 0) scale(var(--liquid-glass-scale-x), var(--liquid-glass-scale-y))'
+            : isDragging 
+                ? 'translate3d(var(--liquid-glass-pos-x), var(--liquid-glass-pos-y), 0)'
+                : 'translate3d(calc(var(--liquid-glass-pos-x) + var(--liquid-glass-translate-x)), calc(var(--liquid-glass-pos-y) + var(--liquid-glass-translate-y)), 0) scale(var(--liquid-glass-scale-x), var(--liquid-glass-scale-y))',
+        zIndex: 10000,
+    };
 
     const containerStyle: React.CSSProperties = {
-        width: glassSize.width,
-        height: glassSize.height,
-        cursor: draggable ? (isDragging ? "grabbing" : "grab") : "default",
+        width: 'var(--liquid-glass-width)',
+        height: 'var(--liquid-glass-height)',
+        cursor: 'var(--liquid-glass-cursor)',
         pointerEvents: "auto",
-        ...(position.centered
-            ? {
-                  position: "fixed",
-                  transform: transformStyle.replace("translate3d(calc(-50% + ", "translate3d(calc(50vw - 50% + ").replace("), calc(-50% + ", "), calc(50vh - 50% + "),
-                  zIndex: 9999,
-              }
-            : {
-                  position: "fixed",
-                  transform: isDragging ? `translate3d(${position.x}px, ${position.y}px, 0)` : `translate3d(${position.x + elasticTranslation.x}px, ${position.y + elasticTranslation.y}px, 0) ${directionalScale}`,
-                  zIndex: 9999,
-              }),
+        position: "fixed",
+        transform: position.centered 
+            ? 'translate3d(calc(50vw - 50% + var(--liquid-glass-translate-x)), calc(50vh - 50% + var(--liquid-glass-translate-y)), 0) scale(var(--liquid-glass-scale-x), var(--liquid-glass-scale-y))'
+            : isDragging 
+                ? 'translate3d(var(--liquid-glass-pos-x), var(--liquid-glass-pos-y), 0)'
+                : 'translate3d(calc(var(--liquid-glass-pos-x) + var(--liquid-glass-translate-x)), calc(var(--liquid-glass-pos-y) + var(--liquid-glass-translate-y)), 0) scale(var(--liquid-glass-scale-x), var(--liquid-glass-scale-y))',
+        zIndex: 9999,
     };
 
     return (
@@ -190,14 +252,14 @@ export function LiquidGlass({
                         className="pointer-events-none bg-black opacity-20"
                         style={{
                             ...borderPositionStyles,
-                            height: glassSize.height,
-                            width: glassSize.width,
-                            borderRadius: `${cornerRadius}px`,
+                            height: 'var(--liquid-glass-height)',
+                            width: 'var(--liquid-glass-width)',
+                            borderRadius: 'var(--liquid-glass-corner-radius)',
                             pointerEvents: "none",
-                            transition: isDragging ? "none" : "transform 0.15s ease-in-out",
+                            transition: 'var(--liquid-glass-transition)',
                             overflow: "hidden",
-                            clipPath: `inset(0 round ${cornerRadius}px)`,
-                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            clipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
+                            WebkitClipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
                             willChange: "transform",
                         }}
                     />
@@ -207,14 +269,14 @@ export function LiquidGlass({
                         className="pointer-events-none bg-black opacity-100"
                         style={{
                             ...borderPositionStyles,
-                            height: glassSize.height,
-                            width: glassSize.width,
-                            borderRadius: `${cornerRadius}px`,
+                            height: 'var(--liquid-glass-height)',
+                            width: 'var(--liquid-glass-width)',
+                            borderRadius: 'var(--liquid-glass-corner-radius)',
                             pointerEvents: "none",
-                            transition: isDragging ? "none" : "transform 0.15s ease-in-out",
+                            transition: 'var(--liquid-glass-transition)',
                             overflow: "hidden",
-                            clipPath: `inset(0 round ${cornerRadius}px)`,
-                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            clipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
+                            WebkitClipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
                             willChange: "transform",
                         }}
                     />
@@ -255,7 +317,7 @@ export function LiquidGlass({
                 {border && (
                     <span className="border-layer-1" style={{
                             ...containerStyle,
-                            zIndex: (containerStyle.zIndex as number) + 1,
+                            zIndex: 10000,
                             pointerEvents: "none",
                             opacity: 0.2,
                             padding: "1.5px",
@@ -263,10 +325,10 @@ export function LiquidGlass({
                             WebkitMaskComposite: "xor",
                             maskComposite: "exclude",
                             boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-                            borderRadius: `${cornerRadius}px`,
+                            borderRadius: 'var(--liquid-glass-corner-radius)',
                             overflow: "hidden",
-                            clipPath: `inset(0 round ${cornerRadius}px)`,
-                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            clipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
+                            WebkitClipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
                             willChange: "transform",
                             transition: isDragging ? "none" : "transform 0.2s ease-out",
                         }}
@@ -274,10 +336,10 @@ export function LiquidGlass({
                         <div style={{
                                 position: "absolute",
                                 inset: 0,
-                                borderRadius: `${cornerRadius}px`,
+                                borderRadius: 'var(--liquid-glass-corner-radius)',
                                 backgroundImage: isDragging
                                     ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.4) 66%, rgba(255, 255, 255, 0.0) 100%)`
-                                    : `linear-gradient(${borderGradientRef.current.angle}deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, ${borderGradientRef.current.opacity1}) ${borderGradientRef.current.stop1}%, rgba(255, 255, 255, ${borderGradientRef.current.opacity2}) ${borderGradientRef.current.stop2}%, rgba(255, 255, 255, 0.0) 100%)`,
+                                    : `linear-gradient(var(--liquid-glass-gradient-angle), rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, var(--liquid-glass-border-opacity1)) var(--liquid-glass-border-stop1), rgba(255, 255, 255, var(--liquid-glass-border-opacity2)) var(--liquid-glass-border-stop2), rgba(255, 255, 255, 0.0) 100%)`,
                             }}
                         />
                     </span>
@@ -287,17 +349,17 @@ export function LiquidGlass({
                 {border && (
                     <span className="border-layer-2" style={{
                             ...containerStyle,
-                            zIndex: (containerStyle.zIndex as number) + 2,
+                            zIndex: 10001,
                             pointerEvents: "none",
                             padding: "1.5px",
                             WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
                             WebkitMaskComposite: "xor",
                             maskComposite: "exclude",
                             boxShadow: "0 0 0 0.5px rgba(255, 255, 255, 0.5) inset, 0 1px 3px rgba(255, 255, 255, 0.25) inset, 0 1px 4px rgba(0, 0, 0, 0.35)",
-                            borderRadius: `${cornerRadius}px`,
+                            borderRadius: 'var(--liquid-glass-corner-radius)',
                             overflow: "hidden",
-                            clipPath: `inset(0 round ${cornerRadius}px)`,
-                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            clipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
+                            WebkitClipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
                             willChange: "transform",
                             transition: isDragging ? "none" : "transform 0.2s ease-out",
                         }}
@@ -306,10 +368,10 @@ export function LiquidGlass({
                             style={{
                                 position: "absolute",
                                 inset: 0,
-                                borderRadius: `${cornerRadius}px`,
+                                borderRadius: 'var(--liquid-glass-corner-radius)',
                                 backgroundImage: isDragging
                                     ? `linear-gradient(135deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.32) 33%, rgba(255, 255, 255, 0.6) 66%, rgba(255, 255, 255, 0.0) 100%)`
-                                    : `linear-gradient(${overlayGradientRef.current.angle}deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, ${overlayGradientRef.current.opacity1}) ${overlayGradientRef.current.stop1}%, rgba(255, 255, 255, ${overlayGradientRef.current.opacity2}) ${overlayGradientRef.current.stop2}%, rgba(255, 255, 255, 0.0) 100%)`,
+                                    : `linear-gradient(var(--liquid-glass-gradient-angle), rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, var(--liquid-glass-overlay-opacity1)) var(--liquid-glass-overlay-stop1), rgba(255, 255, 255, var(--liquid-glass-overlay-opacity2)) var(--liquid-glass-overlay-stop2), rgba(255, 255, 255, 0.0) 100%)`,
                             }}
                         />
                     </span>
@@ -320,16 +382,16 @@ export function LiquidGlass({
                     <div
                         style={{
                             ...borderPositionStyles,
-                            height: glassSize.height,
-                            width: glassSize.width,
-                            borderRadius: `${cornerRadius}px`,
+                            height: 'var(--liquid-glass-height)',
+                            width: 'var(--liquid-glass-width)',
+                            borderRadius: 'var(--liquid-glass-corner-radius)',
                             pointerEvents: "none",
                             transition: isDragging ? "none" : "transform 0.2s ease-out, opacity 0.2s ease-out",
-                            opacity: isHovered ? 0.6 : isActive ? 0.8 : 0,
+                            opacity: 'var(--liquid-glass-hover-opacity)',
                             backgroundImage: "radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%)",
                             overflow: "hidden",
-                            clipPath: `inset(0 round ${cornerRadius}px)`,
-                            WebkitClipPath: `inset(0 round ${cornerRadius}px)`,
+                            clipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
+                            WebkitClipPath: 'inset(0 round var(--liquid-glass-corner-radius))',
                             willChange: "transform, opacity",
                         }}
                     />
