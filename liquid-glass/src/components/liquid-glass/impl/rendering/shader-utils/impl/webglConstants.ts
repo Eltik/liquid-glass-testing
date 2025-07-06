@@ -1,8 +1,19 @@
 /**
- * WebGL shader source constants for liquid glass effects
+ * @fileoverview WebGL shader source constants for optimized liquid glass displacement effects.
+ * 
+ * Provides highly optimized vertex and fragment shader source code implementing advanced
+ * displacement mapping with merged texture lookups and chromatic aberration. These shaders
+ * are specifically designed for real-time performance with consolidated texture operations
+ * and single-pass rendering for maximum efficiency.
  */
 
-// Vertex shader - simple pass-through
+/**
+ * Optimized vertex shader for full-screen quad rendering with texture coordinate pass-through.
+ * 
+ * Simple pass-through vertex shader that renders a full-screen quad with proper texture
+ * coordinate mapping. Uses medium precision for optimal performance while maintaining
+ * visual quality across different GPU configurations.
+ */
 export const VERTEX_SHADER = `
 precision mediump float;
 attribute vec2 a_position;
@@ -15,7 +26,23 @@ void main() {
 }
 `;
 
-// Optimized fragment shader with consolidated displacement and chromatic aberration
+/**
+ * High-performance fragment shader with consolidated displacement mapping and chromatic aberration.
+ * 
+ * Advanced fragment shader implementing single-pass displacement mapping with chromatic aberration
+ * using a merged texture containing all displacement modes. Optimized for real-time performance
+ * with consolidated texture lookups, mode-based sampling, and efficient color channel separation.
+ * 
+ * Features:
+ * - Merged displacement texture with 3 modes in single texture (standard/polar/prominent)
+ * - Mode-based texture coordinate offsetting for efficient mode switching
+ * - Single-pass chromatic aberration with separate RGB channel sampling
+ * - Optimized precision for mobile and desktop GPU compatibility
+ * - Consolidated uniforms for minimal state changes
+ * 
+ * Texture layout: [Standard | Polar | Prominent] horizontally arranged
+ * Mode mapping: 0.0=standard, 1.0=polar, 2.0=prominent
+ */
 export const FRAGMENT_SHADER = `
 precision mediump float;
 varying vec2 v_texCoord;

@@ -1,6 +1,67 @@
+/**
+ * @fileoverview Core glass container component with backdrop filtering and SVG filter integration.
+ * 
+ * Implements the primary glassmorphism container with backdrop filters, SVG displacement
+ * effects, and comprehensive browser compatibility. Manages CSS variable propagation,
+ * filter optimization, and content rendering with sharp text preservation.
+ */
+
 import { forwardRef, useId, useEffect, useRef, type CSSProperties, type PropsWithChildren } from "react";
 import { GlassFilter } from "./glass-filter";
 
+/**
+ * Primary glass container component with advanced backdrop filtering and visual effects.
+ * 
+ * Creates the main glassmorphism container with backdrop blur, saturation, SVG displacement
+ * filters, and comprehensive browser compatibility handling. Manages dynamic CSS variables
+ * for responsive styling and ensures optimal rendering performance across different
+ * environments. Uses forwardRef for proper DOM integration with parent components.
+ * 
+ * Features:
+ * - Backdrop blur and saturation filtering with browser fallbacks
+ * - SVG displacement mapping with WebGL-generated textures
+ * - Dynamic CSS variable management for responsive styling
+ * - Firefox compatibility with filter fallbacks
+ * - Sharp content rendering with preserved text quality
+ * - Comprehensive event handling for interactions
+ * 
+ * @param children - React content rendered inside the glass container
+ * @param className - Additional CSS classes for container styling
+ * @param style - Inline styles applied to the container element
+ * @param displacementScale - WebGL displacement effect intensity (0-100)
+ * @param blurAmount - Backdrop blur intensity multiplier (0-1)
+ * @param saturation - Color saturation percentage (0-300)
+ * @param aberrationIntensity - Chromatic aberration effect strength (0-10)
+ * @param mouseOffset - Current mouse offset for interactive effects
+ * @param onMouseLeave - Mouse leave event handler
+ * @param onMouseEnter - Mouse enter event handler  
+ * @param onMouseDown - Mouse down event handler for drag initiation
+ * @param onMouseUp - Mouse up event handler for drag completion
+ * @param active - Active interaction state for visual feedback
+ * @param overLight - Optimize styling for light background environments
+ * @param cornerRadius - Border radius in pixels for rounded corners
+ * @param padding - CSS padding string for content spacing
+ * @param glassSize - Container dimensions for filter sizing
+ * @param onClick - Click event handler for interactive functionality
+ * @param mode - Visual displacement mode (standard/polar/prominent)
+ * @param effectsRef - Optional ref for content effects targeting
+ * @param ref - Forwarded ref to the container DOM element
+ * @returns Glass container with backdrop filters and content preservation
+ * 
+ * @example
+ * ```tsx
+ * <GlassContainer
+ *   mode="polar"
+ *   displacementScale={30}
+ *   blurAmount={0.1}
+ *   saturation={150}
+ *   cornerRadius={20}
+ *   onClick={() => handleClick()}
+ * >
+ *   <h2>Glass Content</h2>
+ * </GlassContainer>
+ * ```
+ */
 export const GlassContainer = forwardRef<
     HTMLDivElement,
     PropsWithChildren<{
@@ -30,7 +91,14 @@ export const GlassContainer = forwardRef<
 
     const isFirefox = typeof navigator !== "undefined" && navigator.userAgent.toLowerCase().includes("firefox");
 
-    // Update CSS variables for dynamic values
+    /**
+     * Dynamic CSS variable management effect for responsive glass styling.
+     * 
+     * Updates CSS custom properties based on component props and browser compatibility.
+     * Calculates optimized blur values, shadow intensities, and filter URLs while
+     * handling Firefox-specific limitations. Ensures consistent visual quality
+     * across different browsers and lighting environments.
+     */
     useEffect(() => {
         const element = containerRef.current;
         if (!element) return;

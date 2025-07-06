@@ -1,5 +1,31 @@
+/**
+ * @fileoverview Canvas and server-side data URL generation utilities for image processing.
+ * 
+ * Provides dual-mode data URL creation supporting both browser canvas operations
+ * and server-side BMP generation. Essential for cross-platform image processing
+ * in liquid-glass shader systems with graceful fallback mechanisms.
+ */
+
 import { encodeBase64Manual } from "../../../layout/impl/utils";
 
+/**
+ * Creates data URL from image data using browser canvas context.
+ * 
+ * Converts raw RGBA image data into a canvas-generated data URL using browser
+ * APIs. Provides high-quality image encoding with automatic format detection
+ * and error handling. Falls back gracefully when canvas context is unavailable.
+ * 
+ * @param imageData - Raw RGBA pixel data as Uint8ClampedArray
+ * @param width - Image width in pixels
+ * @param height - Image height in pixels
+ * @returns Canvas-generated data URL or empty string on failure
+ * 
+ * @example
+ * ```tsx
+ * const imageData = new Uint8ClampedArray(width * height * 4);
+ * const dataUrl = createCanvasDataURL(imageData, 256, 256);
+ * ```
+ */
 export const createCanvasDataURL = (imageData: Uint8ClampedArray, width: number, height: number): string => {
     try {
         const canvas = document.createElement("canvas");
@@ -21,6 +47,25 @@ export const createCanvasDataURL = (imageData: Uint8ClampedArray, width: number,
     }
 };
 
+/**
+ * Creates BMP data URL for server-side environments without canvas support.
+ * 
+ * Generates a manual BMP file structure with proper headers and pixel data
+ * encoding. Essential for server-side rendering and environments without
+ * canvas APIs. Uses manual base64 encoding for maximum compatibility and
+ * includes comprehensive error handling with fallback data URLs.
+ * 
+ * @param imageData - Raw RGBA pixel data as Uint8ClampedArray
+ * @param width - Image width in pixels for BMP header generation
+ * @param height - Image height in pixels for BMP header generation
+ * @returns BMP-format data URL or transparent GIF fallback on error
+ * 
+ * @example
+ * ```tsx
+ * const imageData = new Uint8ClampedArray(width * height * 4);
+ * const dataUrl = createServerDataURL(imageData, 256, 256);
+ * ```
+ */
 export const createServerDataURL = (imageData: Uint8ClampedArray, width: number, height: number): string => {
     try {
         const header = new Uint8Array(54);

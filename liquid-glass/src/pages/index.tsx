@@ -21,7 +21,8 @@ export default function Test() {
         elasticity,
         blurAmount,
         saturation,
-        border: false,
+        border: true,
+        draggable: true
     };
 
     const [activeTab, setActiveTab] = useState("home");

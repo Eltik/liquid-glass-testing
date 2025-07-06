@@ -1,8 +1,59 @@
+/**
+ * @fileoverview SVG filter system for WebGL-generated displacement mapping and chromatic aberration.
+ * 
+ * Implements sophisticated SVG filter effects using WebGL-generated displacement maps
+ * for realistic glassmorphism distortion. Provides memoized displacement map generation,
+ * conditional chromatic aberration, and comprehensive browser compatibility handling.
+ */
+
 import { useMemo } from "react";
 import { getMap } from "../shaders/impl/getMap";
 
+/**
+ * Advanced SVG filter component with WebGL displacement mapping and chromatic aberration.
+ * 
+ * Creates complex visual effects using SVG filter primitives combined with WebGL-generated
+ * displacement maps. Supports multiple distortion modes, conditional chromatic aberration,
+ * and optimized performance through memoized map generation. Includes SSR compatibility
+ * with graceful fallbacks for server-side rendering environments.
+ * 
+ * Filter composition:
+ * - WebGL-generated displacement map as texture source
+ * - Base displacement mapping for primary distortion effects
+ * - Conditional chromatic aberration with RGB channel separation
+ * - Radial edge masking for natural boundary transitions
+ * - Optimized filter region with extended boundaries
+ * 
+ * @param id - Unique filter identifier for SVG filter element
+ * @param width - Filter width in pixels for proper scaling
+ * @param height - Filter height in pixels for proper scaling
+ * @param mode - Displacement mode: standard/polar/prominent for different effects
+ * @param aberrationIntensity - Chromatic aberration strength (0 disables effect)
+ * @param displacementScale - Primary displacement effect intensity
+ * @param cornerRadius - Border radius for clipping path generation
+ * @returns SVG filter element with displacement and aberration effects
+ * 
+ * @example
+ * ```tsx
+ * <GlassFilter
+ *   id="glass-filter-1"
+ *   width={300}
+ *   height={200}
+ *   mode="polar"
+ *   aberrationIntensity={3}
+ *   displacementScale={25}
+ *   cornerRadius={16}
+ * />
+ * ```
+ */
 export function GlassFilter({ id, width, height, mode, aberrationIntensity, displacementScale, cornerRadius = 20 }: { id: string; width: number; height: number; mode: "standard" | "polar" | "prominent"; aberrationIntensity: number; displacementScale: number; cornerRadius?: number }) {
-    // Memoize displacement map generation - only regenerate when mode changes
+    /**
+     * Memoized displacement map generation with SSR fallback.
+     * 
+     * Generates WebGL-optimized displacement maps only when mode changes,
+     * preventing expensive regeneration on every render. Includes server-side
+     * rendering compatibility with transparent fallback images.
+     */
     const displacementMap = useMemo(() => {
         // Skip WebGL generation during SSR
         if (typeof window === "undefined" || typeof document === "undefined") {
