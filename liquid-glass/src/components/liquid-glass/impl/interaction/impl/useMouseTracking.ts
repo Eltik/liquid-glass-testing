@@ -1,6 +1,43 @@
-import { useCallback, useRef } from "react";
-import type { Vec2 } from "../../types";
+/**
+ * @fileoverview High-performance mouse tracking system with activation zones and RAF optimization.
+ * 
+ * Implements efficient mouse position tracking with intelligent activation zones to prevent
+ * unnecessary updates. Uses RequestAnimationFrame batching for 60fps performance and
+ * dynamic gradient calculation for visual effects.
+ */
 
+import { useCallback, useRef } from "react";
+import type { Vec2 } from "../../../types";
+
+/**
+ * Performance-optimized mouse tracking hook with activation zones and gradient effects.
+ * 
+ * Tracks mouse position relative to glass panel and container, updating visual effects
+ * only when mouse is within activation range. Uses RAF batching to prevent excessive
+ * calculations and maintains smooth 60fps updates. Calculates dynamic gradient parameters
+ * for border effects based on mouse proximity and movement.
+ * 
+ * @param mouseContainer - Container element for mouse tracking scope, defaults to glass element
+ * @param isDragging - Current drag state, disables gradient updates during drag operations
+ * @param borderGradientRef - Mutable ref for border gradient configuration updates
+ * @param overlayGradientRef - Mutable ref for overlay gradient configuration updates  
+ * @param setInternalMouseOffset - Callback to update relative mouse offset percentage
+ * @param setInternalGlobalMousePos - Callback to update absolute mouse coordinates
+ * 
+ * @returns Object containing mouse move handler and RAF reference for cleanup
+ * 
+ * @example
+ * ```tsx
+ * const { handleMouseMove, rafIdRef } = useMouseTracking({
+ *   mouseContainer: containerRef,
+ *   isDragging: false,
+ *   borderGradientRef,
+ *   overlayGradientRef,
+ *   setInternalMouseOffset,
+ *   setInternalGlobalMousePos
+ * });
+ * ```
+ */
 export const useMouseTracking = ({
     mouseContainer,
     isDragging,
@@ -29,13 +66,14 @@ export const useMouseTracking = ({
     setInternalGlobalMousePos: (pos: Vec2) => void;
 }) => {
     const rafIdRef = useRef<number | undefined>(undefined);
-    
-    const handleMouseMove = useCallback((e: MouseEvent, glassRef: React.RefObject<HTMLDivElement | null>) => {
-        if (rafIdRef.current) {
-            return;
-        }
 
-        rafIdRef.current = requestAnimationFrame(() => {
+    const handleMouseMove = useCallback(
+        (e: MouseEvent, glassRef: React.RefObject<HTMLDivElement | null>) => {
+            if (rafIdRef.current) {
+                return;
+            }
+
+            rafIdRef.current = requestAnimationFrame(() => {
                 rafIdRef.current = undefined;
 
                 if (!glassRef.current) {
@@ -46,16 +84,16 @@ export const useMouseTracking = ({
                 const glassRect = glassRef.current.getBoundingClientRect();
                 const glassCenterX = glassRect.left + glassRect.width / 2;
                 const glassCenterY = glassRect.top + glassRect.height / 2;
-                
+
                 const deltaX = e.clientX - glassCenterX;
                 const deltaY = e.clientY - glassCenterY;
-                
+
                 const edgeDistanceX = Math.max(0, Math.abs(deltaX) - glassRect.width / 2);
                 const edgeDistanceY = Math.max(0, Math.abs(deltaY) - glassRect.height / 2);
                 const edgeDistance = Math.sqrt(edgeDistanceX * edgeDistanceX + edgeDistanceY * edgeDistanceY);
-                
+
                 const activationZone = 200;
-                
+
                 // Only update if mouse is within activation zone
                 if (edgeDistance <= activationZone) {
                     const container = mouseContainer?.current ?? glassRef.current;
@@ -100,7 +138,9 @@ export const useMouseTracking = ({
                     setInternalGlobalMousePos(newGlobalMousePos);
                 }
             });
-    }, [mouseContainer, isDragging, setInternalMouseOffset, setInternalGlobalMousePos, borderGradientRef, overlayGradientRef]);
+        },
+        [mouseContainer, isDragging, setInternalMouseOffset, setInternalGlobalMousePos, borderGradientRef, overlayGradientRef],
+    );
 
     return {
         handleMouseMove,

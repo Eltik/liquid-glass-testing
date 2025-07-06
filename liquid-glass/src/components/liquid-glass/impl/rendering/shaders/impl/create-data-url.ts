@@ -1,4 +1,4 @@
-import { encodeBase64Manual } from "../utils";
+import { encodeBase64Manual } from "../../../layout/impl/utils";
 
 export const createCanvasDataURL = (imageData: Uint8ClampedArray, width: number, height: number): string => {
     try {

@@ -21,7 +21,7 @@ export default function Test() {
         elasticity,
         blurAmount,
         saturation,
-        border: false
+        border: false,
     };
 
     const [activeTab, setActiveTab] = useState("home");
@@ -80,5 +80,5 @@ export default function Test() {
                 </LiquidGlass>
             </main>
         </>
-    )
+    );
 }

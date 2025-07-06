@@ -1,14 +1,14 @@
 import { useMemo } from "react";
-import { getMap } from "../../shaders/getMap";
+import { getMap } from "../shaders/impl/getMap";
 
 export function GlassFilter({ id, width, height, mode, aberrationIntensity, displacementScale, cornerRadius = 20 }: { id: string; width: number; height: number; mode: "standard" | "polar" | "prominent"; aberrationIntensity: number; displacementScale: number; cornerRadius?: number }) {
     // Memoize displacement map generation - only regenerate when mode changes
     const displacementMap = useMemo(() => {
         // Skip WebGL generation during SSR
-        if (typeof window === 'undefined' || typeof document === 'undefined') {
-            return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // 1x1 transparent fallback
+        if (typeof window === "undefined" || typeof document === "undefined") {
+            return "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // 1x1 transparent fallback
         }
-        console.log('Generating WebGL displacement map for mode:', mode);
+        console.log("Generating WebGL displacement map for mode:", mode);
         return getMap(mode);
     }, [mode]);
     return (
@@ -33,21 +33,21 @@ export function GlassFilter({ id, width, height, mode, aberrationIntensity, disp
 
                         {/* Base displacement - preserve original colors */}
                         <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" scale={displacementScale * -1} xChannelSelector="R" yChannelSelector="B" result="DISPLACED" />
-                        
+
                         {/* Conditional chromatic aberration only when intensity > 0 */}
                         {aberrationIntensity > 0 ? (
                             <>
                                 {/* Red channel offset */}
                                 <feOffset in="DISPLACED" dx={aberrationIntensity * 0.4} dy={aberrationIntensity * 0.2} result="RED_SHIFT" />
                                 <feColorMatrix in="RED_SHIFT" type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="RED_ONLY" />
-                                
+
                                 {/* Blue channel offset */}
                                 <feOffset in="DISPLACED" dx={-aberrationIntensity * 0.4} dy={-aberrationIntensity * 0.2} result="BLUE_SHIFT" />
                                 <feColorMatrix in="BLUE_SHIFT" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="BLUE_ONLY" />
-                                
+
                                 {/* Green channel (no offset) */}
                                 <feColorMatrix in="DISPLACED" type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="GREEN_ONLY" />
-                                
+
                                 {/* Combine channels with additive blending */}
                                 <feComposite in="RED_ONLY" in2="GREEN_ONLY" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="RG_ADD" />
                                 <feComposite in="RG_ADD" in2="BLUE_ONLY" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
