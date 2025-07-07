@@ -1,29 +1,138 @@
-# Create T3 App
+# LiquidGlass - Advanced WebGL Glassmorphism Effects
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+A Next.js + TypeScript component library providing WebGL-powered liquid glass effects with seamless cross-browser compatibility.
 
-## What's next? How do I make an app with this?
+## Features
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- **Advanced Physics-Based Refraction** - Realistic glass distortion with edge factors and chromatic aberration
+- **Cross-Browser Compatibility** - Works identically in Firefox ≥ v126, Chrome, Safari, and Edge
+- **WebGL 2.0 Pipeline** - Optimized shaders with automatic WebGL 1.0 fallback
+- **Real-Time Performance** - 60fps animations with GPU acceleration
+- **Interactive Effects** - Mouse tracking, elastic physics, and drag behavior
+- **Advanced Lighting** - Realistic shadows, highlights, and fresnel effects
+- **Multi-Pass Rendering** - Gaussian blur pipeline for sophisticated effects
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Compatibility
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+**Works in Chrome, Firefox, Safari, and Edge out of the box.**
 
-## Learn More
+The unified shader implementation combines:
+- Advanced physics-based refraction from example 4 (Firefox-compatible)
+- Sophisticated multi-pass rendering pipeline from example 5 (gold standard)
+- WebGL 2.0 baseline with automatic WebGL 1.0 fallback
+- Browser-specific optimizations for maximum performance
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+## Quick Start
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+```tsx
+import { LiquidGlass } from '~/components/liquid-glass';
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+export default function MyPage() {
+  return (
+    <LiquidGlass
+      displacementMode="polar"
+      displacementScale={25}
+      aberrationIntensity={2}
+      elasticity={0.15}
+    >
+      <div className="p-8">
+        <h1>Your Content Here</h1>
+      </div>
+    </LiquidGlass>
+  );
+}
+```
 
-## How do I deploy this?
+## Component Architecture
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+```
+src/components/liquid-glass/
+├── index.tsx                    # Main component entry point
+├── types.ts                     # TypeScript interfaces
+└── impl/
+    ├── interaction/             # User interaction systems
+    │   └── impl/
+    │       ├── useElasticEffects.ts     # Cursor-based elastic animations
+    │       ├── useGlassBehavior.ts      # Master interaction orchestrator
+    │       ├── useGlassDrag.ts          # Drag-and-drop functionality
+    │       ├── useGlassPosition.ts      # Position management
+    │       ├── useGlassSize.ts          # Content-based auto-sizing
+    │       └── useMouseTracking.ts      # Global mouse tracking
+    ├── layout/                  # Layout and styling utilities
+    │   └── impl/
+    │       ├── useCSSVariables.ts       # Dynamic CSS variable management
+    │       └── utils.ts                 # Position/padding utilities
+    └── rendering/               # Visual effects and WebGL
+        ├── components/
+        │   ├── border-layers.tsx        # Multi-layer border effects
+        │   ├── glass-container.tsx      # Main glass container
+        │   └── glass-filter.tsx         # SVG filter composition
+        ├── shader-utils/        # Unified WebGL pipeline
+        │   └── impl/
+        │       ├── webglConstants.ts    # Unified shader source code
+        │       ├── webglShaderClass.ts  # Cross-browser shader management
+        │       └── webglUtilities.ts    # Browser capability detection
+        └── shaders/            # Displacement map generation
+            └── impl/
+                ├── create-data-url.ts   # Data URL creation
+                └── getMap.ts            # WebGL map generation
+```
+
+## Development
+
+### Commands
+
+```bash
+npm run dev        # Start development server
+npm run build      # Build for production
+npm run typecheck  # Run TypeScript type checking
+npm run lint       # Run ESLint
+npm run check      # Run both linting and type checking
+```
+
+### Browser Testing
+
+The unified implementation has been tested across:
+- Firefox 126+ (WebGL 2.0 with physics-based refraction)
+- Chrome 90+ (Full WebGL 2.0 feature set)
+- Safari 14+ (Optimized for WebKit performance)
+- Edge 90+ (Chromium-based compatibility)
+
+### Performance Optimizations
+
+- **WebGL 2.0 Baseline** - Advanced shader features with automatic fallback
+- **Physics-Based Rendering** - Realistic refraction and chromatic aberration
+- **Multi-Pass Pipeline** - Gaussian blur and advanced lighting effects
+- **CSS Variable Caching** - Minimize DOM updates for 60fps performance
+- **Browser-Specific Tuning** - Optimized parameters for each browser
+
+## Technical Details
+
+### Unified Shader Pipeline
+
+The implementation combines the best elements from multiple examples:
+
+**From Example 4 (Firefox-Compatible):**
+- WebGL 2.0 syntax with `#version 300 es`
+- Physics-based refraction with edge factors
+- Realistic shadow and highlight calculation
+- Chromatic aberration with proper dispersion
+- Aspect ratio correction with bounds checking
+
+**From Example 5 (Gold Standard):**
+- Advanced SDF shape rendering
+- Multi-pass gaussian blur pipeline
+- Fresnel and glare effects
+- LAB/LCH color space transformations
+- Sophisticated background rendering
+
+### Cross-Browser Features
+
+- **Automatic Detection** - WebGL 2.0 preferred, WebGL 1.0 fallback
+- **Extension Management** - Graceful handling of missing extensions
+- **Precision Handling** - High precision on capable browsers
+- **Performance Scaling** - Reduced complexity on resource-constrained devices
+
+---
+
+Built with [T3 Stack](https://create.t3.gg/) - Next.js, TypeScript, and Tailwind CSS.
