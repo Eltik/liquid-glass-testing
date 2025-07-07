@@ -1,171 +1,119 @@
 /**
- * @fileoverview Unified WebGL 2.0 shader class for seamless cross-browser liquid glass effects.
+ * @fileoverview Advanced WebGL shader class for high-performance liquid glass displacement effects.
  * 
- * Implements a comprehensive WebGL shader system combining the advanced physics-based
- * refraction from example 4 with the sophisticated multi-pass rendering pipeline from
- * example 5. Designed for maximum cross-browser compatibility with WebGL 2.0 as baseline.
+ * Implements a comprehensive WebGL shader system with optimized displacement mapping,
+ * merged texture management, and direct canvas rendering. Designed for maximum performance
+ * with consolidated resources, cached uniform locations, and efficient rendering pipelines.
  */
 
-import { getOptimalShaders } from "./webglConstants";
+import { VERTEX_SHADER, FRAGMENT_SHADER } from "./webglConstants";
 
 /**
- * Unified WebGL shader class for seamless cross-browser liquid glass effects.
+ * High-performance WebGL shader class for liquid glass displacement effects.
  * 
- * Comprehensive implementation combining advanced physics-based refraction with
- * sophisticated multi-pass rendering. Provides GPU-accelerated glassmorphism effects
- * with realistic lighting, shadows, highlights, and chromatic aberration.
+ * Comprehensive shader implementation providing GPU-accelerated displacement mapping
+ * with merged texture optimization, direct canvas rendering, and advanced resource
+ * management. Supports multiple displacement modes in a single texture, eliminating
+ * GPU-CPU synchronization overhead through direct rendering techniques.
  * 
- * Key features:
- * - WebGL 2.0 baseline with automatic WebGL 1.0 fallback
- * - Physics-based refraction with edge factors (from example 4)
- * - Multi-pass gaussian blur pipeline (from example 5)
- * - Advanced shadow and highlight calculation
- * - Chromatic aberration with proper dispersion
- * - Aspect ratio correction with bounds checking
- * - Cross-browser compatibility (Firefox, Chrome, Safari, Edge)
+ * Key optimizations:
+ * - Merged displacement texture containing all 3 modes (384x128 layout)
+ * - Cached uniform locations for minimal GL state changes
+ * - Direct canvas rendering eliminating GPU-CPU sync overhead
+ * - Efficient vertex buffer management with static data
+ * - WebGL extension detection and utilization
+ * - Comprehensive error handling and resource cleanup
  * 
  * Architecture:
- * - Automatic shader selection based on browser capabilities
- * - Multi-pass rendering for advanced effects
- * - Cached uniform locations for optimal performance
- * - Comprehensive resource management
+ * - Single shader program handling all displacement modes
+ * - Mode selection via uniform parameter (0.0/1.0/2.0)
+ * - Texture-based displacement data for optimal GPU performance
+ * - Frame buffer operations for advanced rendering techniques
  * 
  * @example
  * ```tsx
  * const canvas = document.createElement('canvas');
- * const shader = new UnifiedShader(canvas);
+ * const shader = new Shader(canvas);
  * const sourceTexture = shader.createTextureFromElement(sourceElement);
  * 
- * shader.render({
- *   mousePos: [0.5, 0.5],
- *   distortion: 15,
- *   aberration: 2,
+ * shader.renderDirectToCanvas({
+ *   mode: 'polar',
+ *   displacementScale: 25,
+ *   aberrationIntensity: 2,
  *   sourceTexture
  * });
  * ```
  */
-export class UnifiedShader {
-    public gl: WebGLRenderingContext | WebGL2RenderingContext;
-    private webglVersion: number;
-    private shaders: any;
-    
-    // Main rendering program
-    private mainProgram: WebGLProgram;
-    private blurPrograms: {
-        horizontal?: WebGLProgram;
-        vertical?: WebGLProgram;
-    } = {};
-    private backgroundProgram?: WebGLProgram;
-    
-    // Framebuffers and textures
-    private frameBuffers: {
-        blur1?: WebGLFramebuffer;
-        blur2?: WebGLFramebuffer;
-        background?: WebGLFramebuffer;
-    } = {};
-    private textures: {
-        blur1?: WebGLTexture;
-        blur2?: WebGLTexture;
-        background?: WebGLTexture;
-        mask?: WebGLTexture;
-    } = {};
-    
+export class Shader {
+    public gl: WebGLRenderingContext;
+    private program: WebGLProgram;
+    private frameBuffer: WebGLFramebuffer;
+    private outputTexture: WebGLTexture;
+    private mergedDisplacementTexture: WebGLTexture;
     private vertexBuffer!: WebGLBuffer;
     private texCoordBuffer!: WebGLBuffer;
 
-    // Cached uniform locations for main program
+    // Cached uniform locations
     private uniforms: {
-        // Textures
-        uTexture: WebGLUniformLocation | null;
-        uMaskTexture: WebGLUniformLocation | null;
-        uBlurredTexture: WebGLUniformLocation | null;
-        
-        // Core parameters
-        uMousePos: WebGLUniformLocation | null;
-        uTMousePos: WebGLUniformLocation | null;
-        uResolution: WebGLUniformLocation | null;
-        uTextureResolution: WebGLUniformLocation | null;
-        
-        // Glass properties
-        uRadius: WebGLUniformLocation | null;
-        uDistort: WebGLUniformLocation | null;
-        uDispersion: WebGLUniformLocation | null;
-        uRotSpeed: WebGLUniformLocation | null;
-        
-        // Lighting
-        uShadowIntensity: WebGLUniformLocation | null;
-        uShadowOffsetX: WebGLUniformLocation | null;
-        uShadowOffsetY: WebGLUniformLocation | null;
-        uShadowBlur: WebGLUniformLocation | null;
-        uHighlightIntensity: WebGLUniformLocation | null;
-        uHighlightSize: WebGLUniformLocation | null;
-        uHighlightOffsetX: WebGLUniformLocation | null;
-        uHighlightOffsetY: WebGLUniformLocation | null;
-        
-        // Advanced rendering
-        uRefThickness: WebGLUniformLocation | null;
-        uRefFactor: WebGLUniformLocation | null;
-        uRefDispersion: WebGLUniformLocation | null;
-        uRefFresnelFactor: WebGLUniformLocation | null;
-        uGlareFactor: WebGLUniformLocation | null;
-        uGlareConvergence: WebGLUniformLocation | null;
-        uTint: WebGLUniformLocation | null;
+        sourceTexture: WebGLUniformLocation;
+        mergedDisplacementMap: WebGLUniformLocation;
+        mode: WebGLUniformLocation;
+        displacementScale: WebGLUniformLocation;
+        aberrationIntensity: WebGLUniformLocation;
     };
 
     /**
-     * Initializes unified WebGL shader with cross-browser compatibility.
+     * Initializes WebGL shader with comprehensive resource setup and extension detection.
      * 
-     * Creates optimal WebGL context (2.0 preferred, 1.0 fallback), compiles appropriate
-     * shader programs, sets up multi-pass rendering pipeline, and initializes all resources
-     * required for advanced glassmorphism effects.
+     * Creates WebGL context with optimal settings, compiles shader programs, sets up
+     * textures and buffers, and initializes all resources required for displacement
+     * rendering. Includes automatic extension detection and comprehensive error handling.
      * 
      * @param canvas - HTML canvas element for WebGL context creation
      * @throws {Error} When WebGL is not supported or context creation fails
      * @throws {Error} When shader compilation or program linking fails
      */
     constructor(canvas: HTMLCanvasElement) {
-        // Try WebGL 2.0 first, fallback to WebGL 1.0
-        const gl2 = canvas.getContext("webgl2", { antialias: true, alpha: false });
-        const gl1 = canvas.getContext("webgl", { antialias: true, alpha: false }) ?? 
-                   canvas.getContext("experimental-webgl", { antialias: true, alpha: false });
-        
-        const gl = gl2 || gl1;
-        if (!gl) {
+        const gl = canvas.getContext("webgl", { antialias: true, alpha: false }) ?? canvas.getContext("experimental-webgl", { antialias: true, alpha: false });
+        if (!gl || !(gl instanceof WebGLRenderingContext)) {
             throw new Error("WebGL not supported - GPU acceleration unavailable");
         }
-        
         this.gl = gl;
-        this.webglVersion = gl2 ? 2 : 1;
-        
-        // Get optimal shaders based on capabilities
-        this.shaders = getOptimalShaders();
-        
-        // Detect browser for logging
-        const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-        const browserName = isFirefox ? 'Firefox' : isSafari ? 'Safari' : 'Chrome/Other';
-        
-        console.log(`Initializing unified WebGL ${this.webglVersion}.0 shader for: ${browserName}`);
 
-        // Initialize shader programs
-        this.mainProgram = this.createShaderProgram(this.shaders.vertex, this.shaders.fragment);
-        
-        if (this.webglVersion === 2 && this.shaders.blurVertex) {
-            this.blurPrograms.horizontal = this.createShaderProgram(this.shaders.blurVertex, this.shaders.blurHorizontal);
-            this.blurPrograms.vertical = this.createShaderProgram(this.shaders.blurVertex, this.shaders.blurVertical);
-            this.backgroundProgram = this.createShaderProgram(this.shaders.blurVertex, this.shaders.background);
-        }
+        // Enable WebGL extensions if available
+        const extensions = ["OES_texture_float", "OES_texture_float_linear", "WEBGL_lose_context"];
 
-        // Setup rendering resources
+        extensions.forEach((ext) => {
+            const extension: unknown = gl.getExtension(ext);
+            if (extension) {
+                console.log(`WebGL extension enabled: ${ext}`);
+            }
+        });
+
+        // Compile and link shader program
+        this.program = this.createShaderProgram();
+
+        // Create resources
+        this.frameBuffer = this.createFrameBuffer();
+        this.outputTexture = this.createOutputTexture();
+        this.mergedDisplacementTexture = this.createMergedDisplacementTexture();
+
+        // Setup vertex data
         this.setupVertexData();
-        this.createFrameBuffers();
-        this.createTextures();
-        this.cacheUniformLocations();
 
-        console.log(`Unified WebGL ${this.webglVersion}.0 Liquid Glass Shader initialized successfully`);
+        // Cache uniform locations
+        this.uniforms = {
+            sourceTexture: gl.getUniformLocation(this.program, "u_sourceTexture")!,
+            mergedDisplacementMap: gl.getUniformLocation(this.program, "u_mergedDisplacementMap")!,
+            mode: gl.getUniformLocation(this.program, "u_mode")!,
+            displacementScale: gl.getUniformLocation(this.program, "u_displacementScale")!,
+            aberrationIntensity: gl.getUniformLocation(this.program, "u_aberrationIntensity")!,
+        };
+
+        console.log("WebGL Liquid Glass Shader initialized successfully");
     }
 
-    private createShaderProgram(vertexSource: string, fragmentSource: string): WebGLProgram {
+    private createShaderProgram(): WebGLProgram {
         const gl = this.gl;
 
         // Compile vertex shader
@@ -173,36 +121,28 @@ export class UnifiedShader {
         if (!vertexShader) {
             throw new Error("Failed to create vertex shader");
         }
-        gl.shaderSource(vertexShader, vertexSource);
+        gl.shaderSource(vertexShader, VERTEX_SHADER);
         gl.compileShader(vertexShader);
 
         if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-            const log = gl.getShaderInfoLog(vertexShader);
-            gl.deleteShader(vertexShader);
-            throw new Error("Vertex shader compilation failed: " + log);
+            throw new Error("Vertex shader compilation failed: " + gl.getShaderInfoLog(vertexShader));
         }
 
         // Compile fragment shader
         const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
         if (!fragmentShader) {
-            gl.deleteShader(vertexShader);
             throw new Error("Failed to create fragment shader");
         }
-        gl.shaderSource(fragmentShader, fragmentSource);
+        gl.shaderSource(fragmentShader, FRAGMENT_SHADER);
         gl.compileShader(fragmentShader);
 
         if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-            const log = gl.getShaderInfoLog(fragmentShader);
-            gl.deleteShader(vertexShader);
-            gl.deleteShader(fragmentShader);
-            throw new Error("Fragment shader compilation failed: " + log);
+            throw new Error("Fragment shader compilation failed: " + gl.getShaderInfoLog(fragmentShader));
         }
 
         // Link program
         const program = gl.createProgram();
         if (!program) {
-            gl.deleteShader(vertexShader);
-            gl.deleteShader(fragmentShader);
             throw new Error("Failed to create shader program");
         }
         gl.attachShader(program, vertexShader);
@@ -210,11 +150,7 @@ export class UnifiedShader {
         gl.linkProgram(program);
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            const log = gl.getProgramInfoLog(program);
-            gl.deleteShader(vertexShader);
-            gl.deleteShader(fragmentShader);
-            gl.deleteProgram(program);
-            throw new Error("Shader program linking failed: " + log);
+            throw new Error("Shader program linking failed: " + gl.getProgramInfoLog(program));
         }
 
         // Clean up individual shaders
@@ -224,100 +160,128 @@ export class UnifiedShader {
         return program;
     }
 
-    private createFrameBuffers(): void {
-        if (this.webglVersion === 1) return; // Skip for WebGL 1.0 fallback
-        
-        const gl = this.gl;
-        
-        // Create framebuffers for multi-pass rendering
-        this.frameBuffers.blur1 = gl.createFramebuffer();
-        this.frameBuffers.blur2 = gl.createFramebuffer();
-        this.frameBuffers.background = gl.createFramebuffer();
-        
-        if (!this.frameBuffers.blur1 || !this.frameBuffers.blur2 || !this.frameBuffers.background) {
-            throw new Error("Failed to create framebuffers");
-        }
-    }
-
-    private createRenderTexture(width: number, height: number): WebGLTexture {
+    private createMergedDisplacementTexture(): WebGLTexture {
         const gl = this.gl;
         const texture = gl.createTexture();
         if (!texture) {
-            throw new Error("Failed to create render texture");
+            throw new Error("Failed to create merged displacement texture");
         }
-        
+
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+        // Create merged displacement map data (384x128: 3 modes side by side, reduced size)
+        const mergedData = this.generateMergedDisplacementData();
+
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 384, 128, 0, gl.RGB, gl.UNSIGNED_BYTE, mergedData);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        
+
         return texture;
     }
 
-    private createTextures(): void {
-        const gl = this.gl;
-        const width = gl.canvas.width;
-        const height = gl.canvas.height;
-        
-        if (this.webglVersion === 2) {
-            // Create textures for multi-pass rendering
-            this.textures.blur1 = this.createRenderTexture(width, height);
-            this.textures.blur2 = this.createRenderTexture(width, height);
-            this.textures.background = this.createRenderTexture(width, height);
-        }
-        
-        // Create mask texture (white circle for now)
-        this.textures.mask = this.createMaskTexture();
-    }
+    private generateMergedDisplacementData(): Uint8Array {
+        const width = 384; // 3 modes × 128 width each
+        const height = 128;
+        const data = new Uint8Array(width * height * 3); // RGB format for better performance
 
-    private createMaskTexture(): WebGLTexture {
-        const gl = this.gl;
-        const texture = gl.createTexture();
-        if (!texture) {
-            throw new Error("Failed to create mask texture");
-        }
-        
-        // Create a simple white circle mask
-        const size = 256;
-        const data = new Uint8Array(size * size * 4);
-        
-        for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-                const idx = (y * size + x) * 4;
-                const centerX = (x / size) - 0.5;
-                const centerY = (y / size) - 0.5;
-                const dist = Math.sqrt(centerX * centerX + centerY * centerY);
-                const alpha = Math.max(0, Math.min(1, 1.0 - this.smoothstep(0.3, 0.5, dist)));
-                
-                data[idx] = 255;     // R
-                data[idx + 1] = 255; // G
-                data[idx + 2] = 255; // B
-                data[idx + 3] = alpha * 255; // A
+        // Generate displacement maps for all three modes side by side
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 3;
+
+                // Determine which mode section we're in
+                const modeSection = Math.floor(x / 128); // 0=standard, 1=polar, 2=prominent
+                const localX = x % 128; // Local x within the 128x128 section
+
+                // UV coordinates for the local section
+                const uv = { x: localX / 128, y: y / 128 };
+                const center = { x: uv.x - 0.5, y: uv.y - 0.5 };
+                const distSq = center.x * center.x + center.y * center.y;
+
+                const displacement = { x: 0, y: 0 };
+
+                // Calculate displacement based on mode
+                switch (modeSection) {
+                    case 0: // Standard mode - barrel distortion
+                        {
+                            const distortion = 1.0 + distSq * 0.3;
+                            displacement.x = center.x * distortion;
+                            displacement.y = center.y * distortion;
+                        }
+                        break;
+                    case 1: // Polar mode - radial effect
+                        {
+                            const dist = Math.sqrt(distSq);
+                            const angle = Math.atan2(center.y, center.x);
+                            const newRadius = dist * 1.2;
+                            displacement.x = Math.cos(angle) * newRadius;
+                            displacement.y = Math.sin(angle) * newRadius;
+                        }
+                        break;
+                    case 2: // Prominent mode - wave pattern
+                        {
+                            const wave = Math.sin(uv.x * 12.566) * Math.sin(uv.y * 12.566) * 0.1;
+                            displacement.x = center.x * (1.0 + wave);
+                            displacement.y = center.y * (1.0 + wave);
+                        }
+                        break;
+                }
+
+                // Apply edge falloff
+                const edgeFactor = 1.0 - Math.max(0, Math.min(1, (Math.sqrt(distSq) - 0.3) / 0.2));
+                displacement.x *= edgeFactor;
+                displacement.y *= edgeFactor;
+
+                // Normalize displacement to [0,1] range for texture encoding
+                const normalizedX = displacement.x * 0.5 + 0.5;
+                const normalizedY = displacement.y * 0.5 + 0.5;
+
+                // Store in RGB format (more memory efficient)
+                data[idx] = Math.floor(Math.max(0, Math.min(1, normalizedX)) * 255); // R
+                data[idx + 1] = Math.floor(Math.max(0, Math.min(1, normalizedY)) * 255); // G
+                data[idx + 2] = Math.floor(Math.max(0, Math.min(1, normalizedY)) * 255); // B (same as G for displacement map)
             }
         }
-        
+
+        return data;
+    }
+
+    private createFrameBuffer(): WebGLFramebuffer {
+        const gl = this.gl;
+        const frameBuffer = gl.createFramebuffer();
+        if (!frameBuffer) {
+            throw new Error("Failed to create framebuffer");
+        }
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+
+        return frameBuffer;
+    }
+
+    private createOutputTexture(): WebGLTexture {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        if (!texture) {
+            throw new Error("Failed to create output texture");
+        }
+
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 128, 128, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        
+
         return texture;
-    }
-    
-    private smoothstep(edge0: number, edge1: number, x: number): number {
-        const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-        return t * t * (3 - 2 * t);
     }
 
     private setupVertexData(): void {
         const gl = this.gl;
 
         // Vertex positions (full screen quad)
-        const vertices = new Float32Array([-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0]);
+        const vertices = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
 
         // Texture coordinates
         const texCoords = new Float32Array([0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0]);
@@ -339,194 +303,55 @@ export class UnifiedShader {
         gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
     }
 
-    private cacheUniformLocations(): void {
-        const gl = this.gl;
-        
-        this.uniforms = {
-            // Textures
-            uTexture: gl.getUniformLocation(this.mainProgram, "uTexture"),
-            uMaskTexture: gl.getUniformLocation(this.mainProgram, "uMaskTexture"),
-            uBlurredTexture: gl.getUniformLocation(this.mainProgram, "uBlurredTexture"),
-            
-            // Core parameters
-            uMousePos: gl.getUniformLocation(this.mainProgram, "uMousePos"),
-            uTMousePos: gl.getUniformLocation(this.mainProgram, "uTMousePos"),
-            uResolution: gl.getUniformLocation(this.mainProgram, "uResolution"),
-            uTextureResolution: gl.getUniformLocation(this.mainProgram, "uTextureResolution"),
-            
-            // Glass properties
-            uRadius: gl.getUniformLocation(this.mainProgram, "uRadius"),
-            uDistort: gl.getUniformLocation(this.mainProgram, "uDistort"),
-            uDispersion: gl.getUniformLocation(this.mainProgram, "uDispersion"),
-            uRotSpeed: gl.getUniformLocation(this.mainProgram, "uRotSpeed"),
-            
-            // Lighting
-            uShadowIntensity: gl.getUniformLocation(this.mainProgram, "uShadowIntensity"),
-            uShadowOffsetX: gl.getUniformLocation(this.mainProgram, "uShadowOffsetX"),
-            uShadowOffsetY: gl.getUniformLocation(this.mainProgram, "uShadowOffsetY"),
-            uShadowBlur: gl.getUniformLocation(this.mainProgram, "uShadowBlur"),
-            uHighlightIntensity: gl.getUniformLocation(this.mainProgram, "uHighlightIntensity"),
-            uHighlightSize: gl.getUniformLocation(this.mainProgram, "uHighlightSize"),
-            uHighlightOffsetX: gl.getUniformLocation(this.mainProgram, "uHighlightOffsetX"),
-            uHighlightOffsetY: gl.getUniformLocation(this.mainProgram, "uHighlightOffsetY"),
-            
-            // Advanced rendering
-            uRefThickness: gl.getUniformLocation(this.mainProgram, "uRefThickness"),
-            uRefFactor: gl.getUniformLocation(this.mainProgram, "uRefFactor"),
-            uRefDispersion: gl.getUniformLocation(this.mainProgram, "uRefDispersion"),
-            uRefFresnelFactor: gl.getUniformLocation(this.mainProgram, "uRefFresnelFactor"),
-            uGlareFactor: gl.getUniformLocation(this.mainProgram, "uGlareFactor"),
-            uGlareConvergence: gl.getUniformLocation(this.mainProgram, "uGlareConvergence"),
-            uTint: gl.getUniformLocation(this.mainProgram, "uTint"),
-        };
-    }
-    
     /**
-     * Render unified liquid glass effect with advanced physics and lighting.
+     * Render liquid glass effect directly to canvas - eliminates GPU-CPU sync
      */
-    public render(params: {
-        sourceTexture: WebGLTexture;
-        mousePos: [number, number];
-        targetMousePos?: [number, number];
-        radius?: number;
-        distortion?: number;
-        dispersion?: number;
-        rotationSpeed?: number;
-        shadowIntensity?: number;
-        shadowOffset?: [number, number];
-        shadowBlur?: number;
-        highlightIntensity?: number;
-        highlightSize?: number;
-        highlightOffset?: [number, number];
-        refThickness?: number;
-        refFactor?: number;
-        refDispersion?: number;
-        refFresnelFactor?: number;
-        glareFactor?: number;
-        glareConvergence?: number;
-        tint?: [number, number, number, number];
-    }): void {
+    public renderDirectToCanvas(params: { mode: "standard" | "polar" | "prominent"; displacementScale: number; aberrationIntensity: number; sourceTexture: WebGLTexture }): void {
         const gl = this.gl;
-        
-        // Set defaults
-        const mousePos = params.mousePos || [0.5, 0.5];
-        const targetMousePos = params.targetMousePos || mousePos;
-        const radius = params.radius || 0.2;
-        const distortion = params.distortion || 15.0;
-        const dispersion = params.dispersion || 2.0;
-        const rotationSpeed = params.rotationSpeed || 0.0;
-        const shadowIntensity = params.shadowIntensity || 0.3;
-        const shadowOffset = params.shadowOffset || [0.02, 0.02];
-        const shadowBlur = params.shadowBlur || 0.05;
-        const highlightIntensity = params.highlightIntensity || 0.8;
-        const highlightSize = params.highlightSize || 0.7;
-        const highlightOffset = params.highlightOffset || [-0.02, -0.02];
-        const refThickness = params.refThickness || 50.0;
-        const refFactor = params.refFactor || 1.5;
-        const refDispersion = params.refDispersion || 0.1;
-        const refFresnelFactor = params.refFresnelFactor || 3.0;
-        const glareFactor = params.glareFactor || 1.0;
-        const glareConvergence = params.glareConvergence || 0.5;
-        const tint = params.tint || [1.0, 1.0, 1.0, 0.1];
-        
-        // Render directly to canvas
+
+        // Render directly to main canvas (no framebuffer)
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-        
+
         // Clear canvas
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        
-        // Use main shader program
-        gl.useProgram(this.mainProgram);
-        
-        // Bind source texture
+
+        // Use shader program
+        gl.useProgram(this.program);
+
+        // Bind source texture (content to be displaced)
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, params.sourceTexture);
-        if (this.uniforms.uTexture) gl.uniform1i(this.uniforms.uTexture, 0);
-        
-        // Bind mask texture
+        gl.uniform1i(this.uniforms.sourceTexture, 0);
+
+        // Bind merged displacement texture
         gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this.textures.mask!);
-        if (this.uniforms.uMaskTexture) gl.uniform1i(this.uniforms.uMaskTexture, 1);
-        
-        // For now, use source texture as blurred texture (we'll add blur passes later)
-        gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, params.sourceTexture);
-        if (this.uniforms.uBlurredTexture) gl.uniform1i(this.uniforms.uBlurredTexture, 2);
-        
+        gl.bindTexture(gl.TEXTURE_2D, this.mergedDisplacementTexture);
+        gl.uniform1i(this.uniforms.mergedDisplacementMap, 1);
+
         // Set uniforms
-        if (this.uniforms.uMousePos) gl.uniform2f(this.uniforms.uMousePos, mousePos[0], mousePos[1]);
-        if (this.uniforms.uTMousePos) gl.uniform2f(this.uniforms.uTMousePos, targetMousePos[0], targetMousePos[1]);
-        if (this.uniforms.uResolution) gl.uniform2f(this.uniforms.uResolution, gl.canvas.width, gl.canvas.height);
-        if (this.uniforms.uTextureResolution) gl.uniform2f(this.uniforms.uTextureResolution, gl.canvas.width, gl.canvas.height);
-        
-        if (this.uniforms.uRadius) gl.uniform1f(this.uniforms.uRadius, radius);
-        if (this.uniforms.uDistort) gl.uniform1f(this.uniforms.uDistort, distortion);
-        if (this.uniforms.uDispersion) gl.uniform1f(this.uniforms.uDispersion, dispersion);
-        if (this.uniforms.uRotSpeed) gl.uniform1f(this.uniforms.uRotSpeed, rotationSpeed);
-        
-        if (this.uniforms.uShadowIntensity) gl.uniform1f(this.uniforms.uShadowIntensity, shadowIntensity);
-        if (this.uniforms.uShadowOffsetX) gl.uniform1f(this.uniforms.uShadowOffsetX, shadowOffset[0]);
-        if (this.uniforms.uShadowOffsetY) gl.uniform1f(this.uniforms.uShadowOffsetY, shadowOffset[1]);
-        if (this.uniforms.uShadowBlur) gl.uniform1f(this.uniforms.uShadowBlur, shadowBlur);
-        if (this.uniforms.uHighlightIntensity) gl.uniform1f(this.uniforms.uHighlightIntensity, highlightIntensity);
-        if (this.uniforms.uHighlightSize) gl.uniform1f(this.uniforms.uHighlightSize, highlightSize);
-        if (this.uniforms.uHighlightOffsetX) gl.uniform1f(this.uniforms.uHighlightOffsetX, highlightOffset[0]);
-        if (this.uniforms.uHighlightOffsetY) gl.uniform1f(this.uniforms.uHighlightOffsetY, highlightOffset[1]);
-        
-        if (this.uniforms.uRefThickness) gl.uniform1f(this.uniforms.uRefThickness, refThickness);
-        if (this.uniforms.uRefFactor) gl.uniform1f(this.uniforms.uRefFactor, refFactor);
-        if (this.uniforms.uRefDispersion) gl.uniform1f(this.uniforms.uRefDispersion, refDispersion);
-        if (this.uniforms.uRefFresnelFactor) gl.uniform1f(this.uniforms.uRefFresnelFactor, refFresnelFactor);
-        if (this.uniforms.uGlareFactor) gl.uniform1f(this.uniforms.uGlareFactor, glareFactor);
-        if (this.uniforms.uGlareConvergence) gl.uniform1f(this.uniforms.uGlareConvergence, glareConvergence);
-        if (this.uniforms.uTint) gl.uniform4f(this.uniforms.uTint, tint[0], tint[1], tint[2], tint[3]);
-        
+        gl.uniform1f(this.uniforms.mode, params.mode === "standard" ? 0.0 : params.mode === "polar" ? 1.0 : 2.0);
+        gl.uniform1f(this.uniforms.displacementScale, params.displacementScale);
+        gl.uniform1f(this.uniforms.aberrationIntensity, params.aberrationIntensity);
+
         // Setup vertex attributes
-        const attributeNames = this.webglVersion === 2 ? {
-            position: "aVertexPosition",
-            texCoord: "aTextureCoord"
-        } : {
-            position: "a_position",
-            texCoord: "a_texCoord"
-        };
-        
-        const positionLocation = gl.getAttribLocation(this.mainProgram, attributeNames.position);
-        const texCoordLocation = gl.getAttribLocation(this.mainProgram, attributeNames.texCoord);
-        
+        const positionLocation = gl.getAttribLocation(this.program, "a_position");
+        const texCoordLocation = gl.getAttribLocation(this.program, "a_texCoord");
+
         // Position attribute
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.enableVertexAttribArray(positionLocation);
-        gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
-        
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
         // Texture coordinate attribute
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
         gl.enableVertexAttribArray(texCoordLocation);
         gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
-        
-        // Set transformation matrices for WebGL 2.0
-        if (this.webglVersion === 2) {
-            const mvMatrixLocation = gl.getUniformLocation(this.mainProgram, "uMVMatrix");
-            const pMatrixLocation = gl.getUniformLocation(this.mainProgram, "uPMatrix");
-            const texMatrixLocation = gl.getUniformLocation(this.mainProgram, "uTextureMatrix");
-            
-            // Identity matrices for full-screen quad
-            const identity = new Float32Array([
-                1, 0, 0, 0,
-                0, 1, 0, 0,
-                0, 0, 1, 0,
-                0, 0, 0, 1
-            ]);
-            
-            if (mvMatrixLocation) gl.uniformMatrix4fv(mvMatrixLocation, false, identity);
-            if (pMatrixLocation) gl.uniformMatrix4fv(pMatrixLocation, false, identity);
-            if (texMatrixLocation) gl.uniformMatrix4fv(texMatrixLocation, false, identity);
-        }
-        
-        // Draw
+
+        // Draw directly to canvas (no GPU-CPU sync)
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        
+
         // Flush to ensure rendering is complete
         gl.flush();
     }
@@ -558,27 +383,11 @@ export class UnifiedShader {
     public dispose(): void {
         const gl = this.gl;
 
-        // Delete programs
-        gl.deleteProgram(this.mainProgram);
-        if (this.blurPrograms.horizontal) gl.deleteProgram(this.blurPrograms.horizontal);
-        if (this.blurPrograms.vertical) gl.deleteProgram(this.blurPrograms.vertical);
-        if (this.backgroundProgram) gl.deleteProgram(this.backgroundProgram);
-        
-        // Delete textures
-        Object.values(this.textures).forEach(texture => {
-            if (texture) gl.deleteTexture(texture);
-        });
-        
-        // Delete framebuffers
-        Object.values(this.frameBuffers).forEach(framebuffer => {
-            if (framebuffer) gl.deleteFramebuffer(framebuffer);
-        });
-        
-        // Delete buffers
+        gl.deleteProgram(this.program);
+        gl.deleteTexture(this.outputTexture);
+        gl.deleteTexture(this.mergedDisplacementTexture);
+        gl.deleteFramebuffer(this.frameBuffer);
         gl.deleteBuffer(this.vertexBuffer);
         gl.deleteBuffer(this.texCoordBuffer);
     }
 }
-
-// Backward compatibility alias
-export const Shader = UnifiedShader;

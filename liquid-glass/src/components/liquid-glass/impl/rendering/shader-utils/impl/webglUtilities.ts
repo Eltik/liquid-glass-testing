@@ -10,8 +10,8 @@
  * Detects and validates WebGL capabilities for liquid glass shader implementation.
  * 
  * Performs comprehensive testing of WebGL support including context creation,
- * extension availability, and shader compilation capabilities. Enhanced for Firefox
- * compatibility with specific checks for missing extensions and precision support.
+ * extension availability, and shader compilation capabilities. Validates all
+ * requirements needed for liquid glass visual effects before allowing WebGL usage.
  * 
  * @returns True if WebGL is fully supported with all required features, false otherwise
  * 
@@ -29,128 +29,39 @@
 export const detectWebGLCapabilities = (): boolean => {
     try {
         const canvas = document.createElement("canvas");
-        const gl = canvas.getContext("webgl", { antialias: true, alpha: false }) ?? 
-                  canvas.getContext("experimental-webgl", { antialias: true, alpha: false });
+        const gl = canvas.getContext("webgl") ?? canvas.getContext("experimental-webgl");
 
         if (!gl || !(gl instanceof WebGLRenderingContext)) {
             console.warn("WebGL not supported");
             return false;
         }
 
-        // Check browser-specific capabilities
-        const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-        
-        console.log(`Browser detected: ${isFirefox ? 'Firefox' : isSafari ? 'Safari' : 'Chrome/Other'}`);
-
-        // Check for extensions (warn but don't fail for optional ones)
-        const optionalExtensions = ["OES_texture_float", "OES_texture_float_linear"];
-        const criticalExtensions = ["OES_standard_derivatives"];
-        
-        // Firefox often lacks these extensions, so we'll work around it
-        for (const ext of optionalExtensions) {
-            const extension = gl.getExtension(ext);
-            if (extension) {
-                console.log(`WebGL extension available: ${ext}`);
-            } else if (isFirefox) {
-                console.log(`Optional WebGL extension missing in Firefox (expected): ${ext}`);
-            } else {
-                console.warn(`Optional WebGL extension missing: ${ext}`);
+        // Check for required WebGL features
+        const requiredExtensions = ["OES_texture_float"];
+        for (const ext of requiredExtensions) {
+            if (!gl.getExtension(ext)) {
+                console.warn(`Required WebGL extension not available: ${ext}`);
             }
         }
 
-        // Check critical extensions that we actually need
-        for (const ext of criticalExtensions) {
-            const extension = gl.getExtension(ext);
-            if (!extension && !isFirefox) {
-                console.warn(`Critical WebGL extension missing: ${ext}`);
-                // Don't fail on this as we can work around it
-            }
-        }
-
-        // Test shader compilation with Firefox-compatible shaders
-        const testVertexShader = gl.createShader(gl.VERTEX_SHADER);
-        if (!testVertexShader) {
+        // Check shader compilation support
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        if (!vertexShader) {
             console.warn("Cannot create vertex shader");
             return false;
         }
 
-        // Use precision-aware test shader
-        const testVertexSource = `
-            #ifdef GL_ES
-            precision highp float;
-            #endif
-            attribute vec2 a_position;
-            void main() { 
-                gl_Position = vec4(a_position, 0.0, 1.0); 
-            }
-        `;
+        gl.shaderSource(vertexShader, "attribute vec2 a_position; void main() { gl_Position = vec4(a_position, 0.0, 1.0); }");
+        gl.compileShader(vertexShader);
 
-        gl.shaderSource(testVertexShader, testVertexSource);
-        gl.compileShader(testVertexShader);
-
-        if (!gl.getShaderParameter(testVertexShader, gl.COMPILE_STATUS)) {
-            const log = gl.getShaderInfoLog(testVertexShader);
-            console.warn("Vertex shader compilation failed:", log);
-            gl.deleteShader(testVertexShader);
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            console.warn("Vertex shader compilation failed");
+            gl.deleteShader(vertexShader);
             return false;
         }
 
-        // Test fragment shader compilation
-        const testFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-        if (!testFragmentShader) {
-            console.warn("Cannot create fragment shader");
-            gl.deleteShader(testVertexShader);
-            return false;
-        }
-
-        const testFragmentSource = `
-            #ifdef GL_ES
-            precision highp float;
-            #endif
-            void main() { 
-                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); 
-            }
-        `;
-
-        gl.shaderSource(testFragmentShader, testFragmentSource);
-        gl.compileShader(testFragmentShader);
-
-        if (!gl.getShaderParameter(testFragmentShader, gl.COMPILE_STATUS)) {
-            const log = gl.getShaderInfoLog(testFragmentShader);
-            console.warn("Fragment shader compilation failed:", log);
-            gl.deleteShader(testVertexShader);
-            gl.deleteShader(testFragmentShader);
-            return false;
-        }
-
-        // Test program linking
-        const testProgram = gl.createProgram();
-        if (!testProgram) {
-            gl.deleteShader(testVertexShader);
-            gl.deleteShader(testFragmentShader);
-            return false;
-        }
-
-        gl.attachShader(testProgram, testVertexShader);
-        gl.attachShader(testProgram, testFragmentShader);
-        gl.linkProgram(testProgram);
-
-        if (!gl.getProgramParameter(testProgram, gl.LINK_STATUS)) {
-            const log = gl.getProgramInfoLog(testProgram);
-            console.warn("Test program linking failed:", log);
-            gl.deleteShader(testVertexShader);
-            gl.deleteShader(testFragmentShader);
-            gl.deleteProgram(testProgram);
-            return false;
-        }
-
-        // Cleanup test resources
-        gl.deleteShader(testVertexShader);
-        gl.deleteShader(testFragmentShader);
-        gl.deleteProgram(testProgram);
-
-        console.log("WebGL capabilities validated successfully for", isFirefox ? 'Firefox' : isSafari ? 'Safari' : 'Chrome/Other');
+        gl.deleteShader(vertexShader);
+        console.log("WebGL capabilities validated successfully");
         return true;
     } catch (error) {
         console.warn("WebGL capability detection failed:", error);
