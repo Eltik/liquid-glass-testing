@@ -1,6 +1,6 @@
 /**
  * @fileoverview Intelligent glass panel sizing system with automatic content measurement.
- * 
+ *
  * Provides sophisticated auto-sizing capabilities that dynamically calculate optimal
  * panel dimensions based on content measurement, padding constraints, and minimum
  * size requirements. Includes ResizeObserver integration for responsive updates
@@ -13,20 +13,20 @@ import { getPaddingValues } from "../../layout/impl/utils";
 
 /**
  * Advanced glass panel sizing hook with automatic content measurement and constraints.
- * 
+ *
  * Dynamically calculates optimal panel dimensions based on content size, padding
  * requirements, and minimum size constraints. Uses ResizeObserver for responsive
  * content changes and includes intelligent caching to prevent unnecessary updates.
  * Supports both fixed sizing and automatic content-based sizing modes.
- * 
+ *
  * Features:
  * - Automatic content measurement with padding calculations
- * - ResizeObserver integration for responsive content changes  
+ * - ResizeObserver integration for responsive content changes
  * - Debounced updates to prevent excessive recalculations
  * - Minimum size constraints with configurable thresholds
  * - Invisible measuring element for accurate size detection
  * - Graceful fallback for browsers without ResizeObserver
- * 
+ *
  * @param width - Fixed width override, enables auto-sizing when omitted
  * @param height - Fixed height override, enables auto-sizing when omitted
  * @param padding - CSS padding string for content spacing calculations
@@ -34,7 +34,7 @@ import { getPaddingValues } from "../../layout/impl/utils";
  * @param minHeight - Minimum height constraint for auto-sizing
  * @param children - React content used for automatic size measurement
  * @returns Object containing size state, measurement refs, and update functions
- * 
+ *
  * @example
  * ```tsx
  * const { glassSize, measureRef, measureStyle } = useGlassSize({
@@ -57,12 +57,12 @@ export function useGlassSize({ width, height, padding = "24px 32px", minWidth = 
 
     /**
      * Core size calculation function with content measurement and constraint application.
-     * 
+     *
      * Measures actual content dimensions using getBoundingClientRect and calculates
      * total panel size including padding. Supports both fixed sizing and automatic
      * content-based sizing modes. Uses RAF scheduling to ensure accurate measurements
      * after DOM updates and applies minimum size constraints.
-     * 
+     *
      * The function handles:
      * - RAF scheduling for accurate post-render measurements
      * - Padding value parsing and application to content dimensions
@@ -159,12 +159,12 @@ export function useGlassSize({ width, height, padding = "24px 32px", minWidth = 
 
     /**
      * Invisible measuring element styles for accurate content dimension detection.
-     * 
+     *
      * Creates an off-screen element that renders content in its natural dimensions
      * without affecting layout or visibility. Uses hardware acceleration and
      * specific positioning to ensure accurate measurements while maintaining
      * optimal rendering performance.
-     * 
+     *
      * Style properties:
      * - Positioned absolutely off-screen to prevent layout interference
      * - Hidden from user view but measurable by DOM APIs

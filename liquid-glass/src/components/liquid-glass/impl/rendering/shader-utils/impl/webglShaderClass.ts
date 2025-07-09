@@ -1,6 +1,6 @@
 /**
  * @fileoverview Advanced WebGL shader class for high-performance liquid glass displacement effects.
- * 
+ *
  * Implements a comprehensive WebGL shader system with optimized displacement mapping,
  * merged texture management, and direct canvas rendering. Designed for maximum performance
  * with consolidated resources, cached uniform locations, and efficient rendering pipelines.
@@ -10,12 +10,12 @@ import { VERTEX_SHADER, FRAGMENT_SHADER } from "./webglConstants";
 
 /**
  * High-performance WebGL shader class for liquid glass displacement effects.
- * 
+ *
  * Comprehensive shader implementation providing GPU-accelerated displacement mapping
  * with merged texture optimization, direct canvas rendering, and advanced resource
  * management. Supports multiple displacement modes in a single texture, eliminating
  * GPU-CPU synchronization overhead through direct rendering techniques.
- * 
+ *
  * Key optimizations:
  * - Merged displacement texture containing all 3 modes (384x128 layout)
  * - Cached uniform locations for minimal GL state changes
@@ -23,19 +23,19 @@ import { VERTEX_SHADER, FRAGMENT_SHADER } from "./webglConstants";
  * - Efficient vertex buffer management with static data
  * - WebGL extension detection and utilization
  * - Comprehensive error handling and resource cleanup
- * 
+ *
  * Architecture:
  * - Single shader program handling all displacement modes
  * - Mode selection via uniform parameter (0.0/1.0/2.0)
  * - Texture-based displacement data for optimal GPU performance
  * - Frame buffer operations for advanced rendering techniques
- * 
+ *
  * @example
  * ```tsx
  * const canvas = document.createElement('canvas');
  * const shader = new Shader(canvas);
  * const sourceTexture = shader.createTextureFromElement(sourceElement);
- * 
+ *
  * shader.renderDirectToCanvas({
  *   mode: 'polar',
  *   displacementScale: 25,
@@ -64,11 +64,11 @@ export class Shader {
 
     /**
      * Initializes WebGL shader with comprehensive resource setup and extension detection.
-     * 
+     *
      * Creates WebGL context with optimal settings, compiles shader programs, sets up
      * textures and buffers, and initializes all resources required for displacement
      * rendering. Includes automatic extension detection and comprehensive error handling.
-     * 
+     *
      * @param canvas - HTML canvas element for WebGL context creation
      * @throws {Error} When WebGL is not supported or context creation fails
      * @throws {Error} When shader compilation or program linking fails

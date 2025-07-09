@@ -1,6 +1,6 @@
 /**
  * @fileoverview WebGL utility functions for liquid glass shader implementation and capability detection.
- * 
+ *
  * Provides comprehensive WebGL support validation, shader compilation testing, and optimized
  * displacement map generation for various visual effect modes. Includes caching mechanisms
  * for performance optimization and graceful fallback handling.
@@ -8,13 +8,13 @@
 
 /**
  * Detects and validates WebGL capabilities for liquid glass shader implementation.
- * 
+ *
  * Performs comprehensive testing of WebGL support including context creation,
  * extension availability, and shader compilation capabilities. Validates all
  * requirements needed for liquid glass visual effects before allowing WebGL usage.
- * 
+ *
  * @returns True if WebGL is fully supported with all required features, false otherwise
- * 
+ *
  * @example
  * ```tsx
  * if (detectWebGLCapabilities()) {
@@ -71,18 +71,18 @@ export const detectWebGLCapabilities = (): boolean => {
 
 /**
  * Creates optimized displacement maps for specific visual effect modes using mathematical algorithms.
- * 
+ *
  * Generates pixel-perfect displacement data for different glassmorphism effects including
  * barrel distortion, radial transformations, and wave patterns. Uses optimized mathematical
  * calculations for real-time performance and applies edge falloff for natural-looking effects.
- * 
+ *
  * @param mode - Visual effect type: "standard" (barrel), "polar" (radial), or "prominent" (wave)
  * @param width - Generated displacement map width in pixels
  * @param height - Generated displacement map height in pixels
  * @returns Base64-encoded data URL of displacement map canvas
- * 
+ *
  * @throws {Error} When 2D canvas context creation fails
- * 
+ *
  * @example
  * ```tsx
  * const displacementData = createModeSpecificMap("polar", 256, 256);
@@ -168,22 +168,22 @@ export const extractedModeCache = new Map<string, string>();
 
 /**
  * Main displacement map generator with comprehensive validation and caching.
- * 
+ *
  * Orchestrates the complete displacement map generation process including WebGL
  * capability validation, cache management, and mode-specific map creation.
  * Provides intelligent caching to prevent expensive regeneration and validates
  * browser environment requirements before proceeding.
- * 
+ *
  * @param type - Visual effect mode for displacement generation
  * @param width - Map width in pixels, defaults to 256 for optimal performance
- * @param height - Map height in pixels, defaults to 256 for optimal performance  
+ * @param height - Map height in pixels, defaults to 256 for optimal performance
  * @param _displacementScale - Unused parameter maintained for API compatibility
  * @param _aberrationIntensity - Unused parameter maintained for API compatibility
  * @returns Base64-encoded displacement map data URL
- * 
+ *
  * @throws {Error} When browser environment is not available
  * @throws {Error} When WebGL capabilities are insufficient
- * 
+ *
  * @example
  * ```tsx
  * try {

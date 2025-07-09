@@ -1,6 +1,6 @@
 /**
  * @fileoverview Type definitions for the liquid-glass component system.
- * 
+ *
  * Provides core geometric and positioning interfaces used throughout
  * the glassmorphism effect implementation for consistent type safety
  * and clear data structure definitions.
@@ -9,7 +9,7 @@
 /**
  * Two-dimensional vector representing coordinates or offsets in 2D space.
  * Used extensively for mouse tracking, positioning, and physics calculations.
- * 
+ *
  * @example
  * ```ts
  * const mousePos: Vec2 = { x: 150, y: 200 };
@@ -27,7 +27,7 @@ export interface Vec2 {
  * Dimensions interface for glass panel sizing operations.
  * Represents the calculated or fixed size of the glass container
  * after content measurement and constraint application.
- * 
+ *
  * @example
  * ```ts
  * const size: IGlassSize = { width: 300, height: 200 };
@@ -44,7 +44,7 @@ export interface IGlassSize {
  * Position state interface combining coordinates with centering mode.
  * Tracks both absolute positioning and whether the panel should
  * auto-center within the viewport.
- * 
+ *
  * @example
  * ```ts
  * const centered: IGlassPosition = { x: 0, y: 0, centered: true };

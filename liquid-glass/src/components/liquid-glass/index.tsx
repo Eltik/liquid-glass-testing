@@ -1,14 +1,14 @@
 /**
- * @fileoverview Main entry point for the LiquidGlass component - a high-performance glassmorphism 
+ * @fileoverview Main entry point for the LiquidGlass component - a high-performance glassmorphism
  * effect system with WebGL-accelerated displacement mapping, elastic physics, and advanced visual effects.
- * 
+ *
  * This module orchestrates the complete liquid glass rendering pipeline including:
  * - Interactive drag behavior with viewport constraints
  * - Real-time elastic physics and directional scaling
  * - GPU-accelerated displacement mapping with chromatic aberration
  * - Dynamic CSS variable management for smooth animations
  * - Multi-layered border rendering with gradient effects
- * 
+ *
  * The component uses a modular architecture with specialized hooks for interaction,
  * layout management, and rendering optimizations to maintain 60fps performance.
  */
@@ -24,19 +24,19 @@ import type { Vec2 } from "./types";
 
 /**
  * Advanced glassmorphism component with physics-based interactions and WebGL acceleration.
- * 
+ *
  * Creates a translucent, interactive glass panel with:
  * - Realistic elastic physics responding to mouse proximity
  * - GPU-accelerated visual distortion effects
  * - Smooth drag-and-drop functionality with boundary constraints
  * - Dynamic gradient borders and hover effects
  * - Multiple visual modes (standard, polar, prominent)
- * 
+ *
  * Performance optimized for 60fps with RAF-based updates and CSS variable caching.
  * Supports both controlled and uncontrolled mouse tracking modes.
- * 
+ *
  * @param width - Fixed width in pixels, auto-calculated from content if omitted
- * @param height - Fixed height in pixels, auto-calculated from content if omitted  
+ * @param height - Fixed height in pixels, auto-calculated from content if omitted
  * @param padding - CSS padding string applied to content area (default: "24px 32px")
  * @param initialPosition - Starting position {x, y}, centered if omitted
  * @param draggable - Enable drag functionality (default: true)
@@ -57,9 +57,9 @@ import type { Vec2 } from "./types";
  * @param aberrationIntensity - Chromatic aberration strength (default: 2)
  * @param cornerRadius - Border radius in pixels (default: 16)
  * @param border - Enable multi-layer border rendering (default: true)
- * 
+ *
  * @throws {Error} When WebGL initialization fails in shader modes
- * 
+ *
  * @example
  * ```tsx
  * <LiquidGlass

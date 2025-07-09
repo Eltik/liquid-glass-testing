@@ -22,7 +22,7 @@ export default function Test() {
         blurAmount,
         saturation,
         border: true,
-        draggable: true
+        draggable: true,
     };
 
     const [activeTab, setActiveTab] = useState("home");

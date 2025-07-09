@@ -1,6 +1,6 @@
 /**
  * @fileoverview High-performance mouse tracking system with activation zones and RAF optimization.
- * 
+ *
  * Implements efficient mouse position tracking with intelligent activation zones to prevent
  * unnecessary updates. Uses RequestAnimationFrame batching for 60fps performance and
  * dynamic gradient calculation for visual effects.
@@ -11,21 +11,21 @@ import type { Vec2 } from "../../../types";
 
 /**
  * Performance-optimized mouse tracking hook with activation zones and gradient effects.
- * 
+ *
  * Tracks mouse position relative to glass panel and container, updating visual effects
  * only when mouse is within activation range. Uses RAF batching to prevent excessive
  * calculations and maintains smooth 60fps updates. Calculates dynamic gradient parameters
  * for border effects based on mouse proximity and movement.
- * 
+ *
  * @param mouseContainer - Container element for mouse tracking scope, defaults to glass element
  * @param isDragging - Current drag state, disables gradient updates during drag operations
  * @param borderGradientRef - Mutable ref for border gradient configuration updates
- * @param overlayGradientRef - Mutable ref for overlay gradient configuration updates  
+ * @param overlayGradientRef - Mutable ref for overlay gradient configuration updates
  * @param setInternalMouseOffset - Callback to update relative mouse offset percentage
  * @param setInternalGlobalMousePos - Callback to update absolute mouse coordinates
- * 
+ *
  * @returns Object containing mouse move handler and RAF reference for cleanup
- * 
+ *
  * @example
  * ```tsx
  * const { handleMouseMove, rafIdRef } = useMouseTracking({

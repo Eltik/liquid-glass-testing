@@ -1,6 +1,6 @@
 /**
  * @fileoverview Composite hook orchestrating complete glass panel behavior.
- * 
+ *
  * Combines sizing, positioning, and drag functionality into a single cohesive
  * interaction system. This hook acts as the main entry point for all glass
  * panel physics and user interaction capabilities.
@@ -13,11 +13,11 @@ import { useGlassDrag } from "./useGlassDrag";
 
 /**
  * Main glass behavior orchestration hook combining sizing, positioning, and drag functionality.
- * 
+ *
  * Provides a unified interface for managing the complete lifecycle of glass panel interactions
  * including auto-sizing from content, viewport positioning, and drag-and-drop operations.
  * All constituent hooks are properly coordinated to maintain consistent state.
- * 
+ *
  * @param width - Fixed width override, enables auto-sizing when omitted
  * @param height - Fixed height override, enables auto-sizing when omitted
  * @param padding - CSS padding applied to content measurement and final render
@@ -26,14 +26,14 @@ import { useGlassDrag } from "./useGlassDrag";
  * @param minWidth - Minimum width constraint for auto-sizing calculations
  * @param minHeight - Minimum height constraint for auto-sizing calculations
  * @param children - React content used for automatic size measurement
- * 
+ *
  * @returns Object containing all panel state, refs, handlers, and control functions
- * 
+ *
  * @example
  * ```tsx
  * const {
  *   glassSize,
- *   position, 
+ *   position,
  *   isDragging,
  *   measureRef,
  *   containerRef,

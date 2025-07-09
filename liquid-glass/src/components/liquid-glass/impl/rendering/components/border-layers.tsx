@@ -1,6 +1,6 @@
 /**
  * @fileoverview Multi-layer border rendering system for enhanced glassmorphism visual effects.
- * 
+ *
  * Implements sophisticated border layer composition using CSS masks, gradients, and blend modes
  * to create realistic glass edge effects. Provides dynamic gradient adjustments based on
  * mouse position and interaction states for immersive visual feedback.
@@ -10,7 +10,7 @@ import React from "react";
 
 /**
  * Props interface for BorderLayers component configuration.
- * 
+ *
  * Defines all properties required for multi-layer border rendering including
  * positioning styles, interaction states, and visual mode configurations.
  */
@@ -31,18 +31,18 @@ interface BorderLayersProps {
 
 /**
  * Multi-layer border rendering component with dynamic gradients and blend modes.
- * 
+ *
  * Creates sophisticated glassmorphism borders using multiple overlay layers with
  * different blend modes, CSS masks, and dynamic gradients. Supports light/dark
  * background optimization and interactive hover effects. Uses CSS variables
  * for smooth gradient animations based on mouse position.
- * 
+ *
  * Layer composition:
  * - Over-light background layers (conditional)
  * - Screen blend mode border layer with CSS mask
  * - Overlay blend mode border layer with enhanced gradients
  * - Interactive hover effect layer (when onClick provided)
- * 
+ *
  * @param border - Controls overall border rendering visibility
  * @param overLight - Enables optimized styling for light backgrounds
  * @param borderPositionStyles - Positioning and transform styles for border overlays
@@ -50,7 +50,7 @@ interface BorderLayersProps {
  * @param isDragging - Disables transitions during drag operations for smooth performance
  * @param onClick - Optional click handler that enables hover effect rendering
  * @returns Multi-layer border composition or null when disabled
- * 
+ *
  * @example
  * ```tsx
  * <BorderLayers
