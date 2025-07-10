@@ -1,8 +1,32 @@
+/**
+ * Original Liquid Glass Component Test Page
+ * 
+ * Demonstrates the original liquid-glass component with interactive controls.
+ * Features the CSS-based glassmorphism effect with WebGL displacement mapping
+ * and elastic physics interactions.
+ * 
+ * This page showcases:
+ * - Multiple displacement modes (standard, polar, prominent)
+ * - Real-time parameter adjustment
+ * - Interactive glass panels with drag functionality
+ * - Various visual effect controls
+ * - Performance-optimized rendering
+ * 
+ * Serves as both a demo and testing environment for the original
+ * liquid glass implementation.
+ */
+
 import { useState, useRef } from "react";
 import { LiquidGlass } from "~/components/liquid-glass";
 
+/**
+ * Test page demonstrating the original liquid glass component
+ */
 export default function Test() {
+    /** Reference to mouse tracking container */
     const mouseContainerRef = useRef<HTMLDivElement>(null);
+    
+    /** Visual effect parameters with interactive controls */
     const [displacementMode, setDisplacementMode] = useState<"standard" | "polar" | "prominent">("standard");
     const [displacementScale, setDisplacementScale] = useState(70);
     const [aberrationIntensity, setAberrationIntensity] = useState(2);
@@ -10,21 +34,25 @@ export default function Test() {
     const [saturation, setSaturation] = useState(140);
     const [blurAmount, setBlurAmount] = useState(0.0625);
 
-    // Common props for both implementations
+    /**
+     * Common props shared across liquid glass instances
+     * Consolidates settings for consistent appearance and behavior
+     */
     const commonProps = {
-        padding: "16px 32px",
-        cornerRadius: 16,
-        displacementScale,
-        className: "shadow-lg",
-        mode: displacementMode,
-        aberrationIntensity,
-        elasticity,
-        blurAmount,
-        saturation,
-        border: true,
-        draggable: true,
+        padding: "16px 32px",           // Content padding
+        cornerRadius: 16,              // Border radius
+        displacementScale,             // WebGL displacement intensity
+        className: "shadow-lg",        // Additional styling
+        mode: displacementMode,        // Visual displacement mode
+        aberrationIntensity,           // Chromatic aberration strength
+        elasticity,                    // Physics responsiveness
+        blurAmount,                    // Backdrop blur intensity
+        saturation,                    // Color saturation
+        border: true,                  // Enable border effects
+        draggable: true,               // Enable drag functionality
     };
 
+    /** Active tab state for demo navigation */
     const [activeTab, setActiveTab] = useState("home");
 
     return (

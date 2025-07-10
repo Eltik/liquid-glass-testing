@@ -1,3 +1,25 @@
+/**
+ * LiquidGlass Component v2 - Main Entry Point
+ * 
+ * This file serves as the primary interface for the liquid glass visual effect component.
+ * It implements a sophisticated glass-like morphing effect using WebGL2 shaders and
+ * multi-pass rendering techniques.
+ * 
+ * Key Architecture Features:
+ * - Multi-pass rendering pipeline for complex visual effects
+ * - Real-time mouse tracking with spring physics
+ * - Dynamic shape morphing based on mouse velocity
+ * - Blur effects using Gaussian kernels
+ * - Refraction and glare effects for realistic glass appearance
+ * - Support for both static images and video backgrounds
+ * 
+ * Performance Considerations:
+ * - Uses WebGL2 for hardware acceleration
+ * - Implements frame buffer objects for efficient multi-pass rendering
+ * - Optimized shader uniforms to minimize GPU state changes
+ * - Spring physics calculations are performed on CPU to reduce GPU workload
+ */
+
 import React, { useEffect, useRef, useState, useMemo, useCallback, type CSSProperties } from "react";
 import { MultiPassRenderer, loadTextureFromURL, createEmptyTexture, updateVideoTexture, computeGaussianKernelByRadius } from "./impl/lib";
 import type { RenderUniformValue } from "./impl/types/lib";
@@ -5,82 +27,161 @@ import type { RenderUniformValue } from "./impl/types/lib";
 // Import shaders from TypeScript modules
 import { VertexShader, FragmentBgShader, FragmentBgVblurShader, FragmentBgHblurShader, FragmentMainShader } from "./impl/shaders";
 
-// Types
+/**
+ * Props interface for the LiquidGlass component
+ * 
+ * This interface defines all configurable parameters for the liquid glass effect.
+ * Parameters are organized into logical groups for better maintainability:
+ * - Canvas settings: size, resolution, device pixel ratio
+ * - Background settings: type, image, video sources
+ * - Shape settings: dimensions, roundness, visibility
+ * - Interaction settings: mouse tracking, spring physics
+ * - Visual effects: blur, shadows, tinting, refraction, glare
+ * - Debug settings: step-by-step rendering visualization
+ */
 export interface LiquidGlassProps {
+    /** React children to render on top of the glass effect */
     children?: React.ReactNode;
+    /** CSS class name for the container */
     className?: string;
+    /** CSS styles for the container */
     style?: CSSProperties;
 
     // Canvas settings
+    /** Canvas width in pixels */
     width?: number;
+    /** Canvas height in pixels */
     height?: number;
+    /** Device pixel ratio for high-DPI displays */
     dpr?: number;
 
     // Background settings
+    /** Background type: 0=texture, 1=solid color, 2=gradient */
     backgroundType?: number;
+    /** URL of background image */
     backgroundImage?: string;
+    /** HTML video element for video backgrounds */
     backgroundVideo?: HTMLVideoElement;
 
     // Shape settings
+    /** Base width of the glass shape in pixels */
     shapeWidth?: number;
+    /** Base height of the glass shape in pixels */
     shapeHeight?: number;
-    shapeRadius?: number; // 0-100
+    /** Border radius of the glass shape (0-100) */
+    shapeRadius?: number;
+    /** Roundness factor for shape corners */
     shapeRoundness?: number;
+    /** Whether to show the glass shape */
     showShape?: boolean;
+    /** Rate at which shapes merge together (0-100) */
     mergeRate?: number;
 
     // Mouse interaction
+    /** Enable mouse position tracking */
     enableMouseTracking?: boolean;
+    /** Spring stiffness for mouse tracking physics */
     springStiffness?: number;
+    /** Spring damping for mouse tracking physics */
     springDamping?: number;
+    /** Factor by which mouse velocity affects shape size */
     springSizeFactor?: number;
 
     // Blur settings
+    /** Gaussian blur radius in pixels */
     blurRadius?: number;
 
     // Shadow settings
+    /** Amount to expand shadow beyond shape bounds */
     shadowExpand?: number;
-    shadowFactor?: number; // 0-100
+    /** Shadow opacity factor (0-100) */
+    shadowFactor?: number;
+    /** Shadow offset position */
     shadowPosition?: { x: number; y: number };
 
     // Glass tint
+    /** RGBA color tint for glass effect */
     tint?: { r: number; g: number; b: number; a: number };
 
     // Refraction settings
+    /** Thickness of refraction effect in pixels */
     refractionThickness?: number;
+    /** Refraction strength multiplier */
     refractionFactor?: number;
+    /** Chromatic dispersion amount */
     refractionDispersion?: number;
+    /** Fresnel effect range */
     refractionFresnelRange?: number;
-    refractionFresnelHardness?: number; // 0-100
-    refractionFresnelFactor?: number; // 0-100
+    /** Fresnel effect hardness (0-100) */
+    refractionFresnelHardness?: number;
+    /** Fresnel effect intensity (0-100) */
+    refractionFresnelFactor?: number;
 
     // Glare settings
-    glareAngle?: number; // degrees
+    /** Glare angle in degrees */
+    glareAngle?: number;
+    /** Glare effect range in pixels */
     glareRange?: number;
-    glareHardness?: number; // 0-100
-    glareConvergence?: number; // 0-100
-    glareOppositeFactor?: number; // 0-100
-    glareFactor?: number; // 0-100
+    /** Glare edge hardness (0-100) */
+    glareHardness?: number;
+    /** Glare convergence factor (0-100) */
+    glareConvergence?: number;
+    /** Glare opposite side factor (0-100) */
+    glareOppositeFactor?: number;
+    /** Overall glare intensity (0-100) */
+    glareFactor?: number;
 
     // Debug
+    /** Debug step for shader development (0=off) */
     debugStep?: number;
 
     // Callbacks
+    /** Called when WebGL context is ready */
     onReady?: (gl: WebGL2RenderingContext) => void;
+    /** Called when an error occurs */
     onError?: (error: Error) => void;
 }
 
-// Spring controller for smooth mouse tracking
+/**
+ * Spring Controller for Smooth Mouse Tracking
+ * 
+ * This class implements a spring-damper system for smooth mouse position interpolation.
+ * It uses Hooke's law physics to create natural-feeling movement that responds to mouse
+ * position changes with realistic acceleration and deceleration.
+ * 
+ * Physics Implementation:
+ * - Uses spring force: F = -k * displacement
+ * - Applies damping force: F = -c * velocity
+ * - Integrates forces to update position over time
+ * 
+ * The spring system prevents jarring movements and creates a fluid, organic feel
+ * that enhances the liquid glass effect's believability.
+ */
 class SpringController {
+    /** Current spring position */
     private value: { x: number; y: number };
+    /** Current velocity vector */
     private velocity: { x: number; y: number };
+    /** Target position to spring towards */
     private target: { x: number; y: number };
+    /** Spring stiffness coefficient (higher = stiffer) */
     private stiffness: number;
+    /** Damping coefficient (higher = more damped) */
     private damping: number;
+    /** Previous frame's position for velocity calculation */
     private lastValue: { x: number; y: number };
+    /** Previous frame timestamp */
     private lastTime: number | null = null;
+    /** Calculated display velocity for visual effects */
     private displayVelocity: { x: number; y: number };
 
+    /**
+     * Initialize spring controller with physics parameters
+     * 
+     * @param initial - Initial position
+     * @param stiffness - Spring stiffness (170 provides good responsiveness)
+     * @param damping - Damping coefficient (26 provides smooth settling)
+     */
     constructor(initial = { x: 0, y: 0 }, stiffness = 170, damping = 26) {
         this.value = { ...initial };
         this.velocity = { x: 0, y: 0 };
@@ -91,39 +192,58 @@ class SpringController {
         this.displayVelocity = { x: 0, y: 0 };
     }
 
+    /**
+     * Set new target position for the spring to track
+     * 
+     * @param target - New target position
+     */
     setTarget(target: { x: number; y: number }) {
         this.target = target;
     }
 
+    /**
+     * Update spring physics simulation
+     * 
+     * This method integrates the spring-damper differential equation:
+     * F = -k*x - c*v, where k=stiffness, c=damping, x=displacement, v=velocity
+     * 
+     * @param deltaTime - Time elapsed since last update in milliseconds
+     */
     update(deltaTime: number) {
-        const dt = Math.min(deltaTime / 1000, 0.1); // Cap at 100ms
+        // Cap delta time to prevent instability from frame drops
+        const dt = Math.min(deltaTime / 1000, 0.1);
 
+        // Calculate displacement from target
         const dx = this.target.x - this.value.x;
         const dy = this.target.y - this.value.y;
 
+        // Apply spring force and damping
         const ax = dx * this.stiffness - this.velocity.x * this.damping;
         const ay = dy * this.stiffness - this.velocity.y * this.damping;
 
+        // Integrate acceleration to get velocity
         this.velocity.x += ax * dt;
         this.velocity.y += ay * dt;
 
+        // Integrate velocity to get position
         this.value.x += this.velocity.x * dt;
         this.value.y += this.velocity.y * dt;
 
-        // Calculate display velocity similar to react-spring
+        // Calculate display velocity for visual effects
+        // This provides a smooth velocity measurement for shape morphing
         const now = Date.now();
         if (this.lastTime) {
             const realDt = now - this.lastTime;
             const valueDx = this.value.x - this.lastValue.x;
             const valueDy = this.value.y - this.lastValue.y;
 
-            // Convert to velocity in pixels per millisecond, then scale appropriately
+            // Convert to velocity in pixels per millisecond
             const speed = {
                 x: valueDx / realDt,
                 y: valueDy / realDt,
             };
 
-            // Check for extreme values and reset if needed
+            // Prevent numerical instability from extreme values
             if (Math.abs(speed.x) > 1e10 || Math.abs(speed.y) > 1e10) {
                 speed.x = 0;
                 speed.y = 0;

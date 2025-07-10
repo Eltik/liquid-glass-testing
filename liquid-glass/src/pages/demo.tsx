@@ -1,32 +1,57 @@
+/**
+ * Liquid Glass v2 Demo Page
+ * 
+ * Interactive demo showcasing the liquid-glass-v2 component with comprehensive
+ * controls for all visual parameters. Allows real-time experimentation with
+ * glass effects, physics, and rendering settings.
+ * 
+ * Features:
+ * - Live parameter adjustment with immediate visual feedback
+ * - Background type switching (patterns, images, videos)
+ * - Physics tuning (spring stiffness, damping, elasticity)
+ * - Visual effect controls (blur, refraction, glare, shadows)
+ * - Debug mode for development and education
+ * 
+ * This demo serves as both a testing environment and documentation
+ * of the component's capabilities.
+ */
+
 import React, { useCallback, useState } from "react";
 import { LiquidGlass } from "~/components/liquid-glass-v2";
 import { type NextPage } from "next";
 import Head from "next/head";
 import styles from "./demo.module.css";
 
+/**
+ * Demo page component with interactive controls for liquid glass v2
+ */
 const Demo: NextPage = () => {
+    /**
+     * Settings state for all liquid glass parameters
+     * Organized by category for clear parameter management
+     */
     const [settings, setSettings] = useState({
-        // Canvas settings
+        // Canvas settings - control rendering dimensions
         width: 600,
         height: 400,
 
-        // Background settings
-        backgroundType: 0,
-        backgroundImage: "",
+        // Background settings - control scene content
+        backgroundType: 0,          // 0=pattern, 10+=texture
+        backgroundImage: "",        // URL for background image
 
-        // Shape settings
-        shapeWidth: 200,
-        shapeHeight: 200,
-        shapeRadius: 80,
-        shapeRoundness: 5,
-        showShape: true,
-        mergeRate: 0.05,
+        // Shape settings - control glass geometry
+        shapeWidth: 200,           // Glass shape width in pixels
+        shapeHeight: 200,          // Glass shape height in pixels
+        shapeRadius: 80,           // Corner radius (0-100)
+        shapeRoundness: 5,         // Corner curve smoothness
+        showShape: true,           // Whether to show optional shapes
+        mergeRate: 0.05,          // How smoothly shapes blend
 
-        // Mouse interaction
-        enableMouseTracking: true,
-        springStiffness: 80,
-        springDamping: 40,
-        springSizeFactor: 10,
+        // Mouse interaction - control physics behavior
+        enableMouseTracking: true,  // Enable mouse following
+        springStiffness: 80,       // Spring responsiveness
+        springDamping: 40,         // Spring damping factor
+        springSizeFactor: 10,      // Velocity-based shape morphing
 
         // Blur settings
         blurRadius: 1,

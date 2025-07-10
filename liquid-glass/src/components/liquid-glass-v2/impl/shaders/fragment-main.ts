@@ -1,119 +1,254 @@
+/**
+ * Fragment Shader for Glass Effects Composite Pass
+ * 
+ * This is the most complex shader in the liquid glass pipeline, responsible for
+ * creating all the visual effects that make the glass look realistic:
+ * 
+ * Core Effects Implemented:
+ * 1. Shape Definition - Using signed distance fields for perfect geometry
+ * 2. Refraction - Physically-based light bending through glass
+ * 3. Chromatic Dispersion - Color separation like in real glass
+ * 4. Fresnel Reflections - Edge-based reflectivity
+ * 5. Glare Effects - Directional light highlights
+ * 6. Color Tinting - Glass material coloration
+ * 
+ * Mathematical Foundations:
+ * - Snell's law for refraction calculations
+ * - Gaussian and superellipse SDFs for shape definition
+ * - Color space conversions (sRGB ↔ LAB ↔ LCH) for perceptual effects
+ * - Gradient estimation for surface normal calculation
+ * 
+ * The shader supports multiple debug steps for development and testing,
+ * allowing visualization of individual effect components.
+ */
+
 export const fragmentMainShader = `#version 300 es
 
+// Use high precision for accurate optical calculations
 precision highp float;
 
+// Mathematical constants
 #define PI (3.14159265359)
 
-const float N_R = 1.0 - 0.02;
-const float N_G = 1.0;
-const float N_B = 1.0 + 0.02;
+// Refractive indices for RGB channels (creates chromatic dispersion)
+// Values are slightly offset from 1.0 to simulate real glass dispersion
+const float N_R = 1.0 - 0.02;  // Red light refracts less
+const float N_G = 1.0;         // Green light baseline
+const float N_B = 1.0 + 0.02;  // Blue light refracts more
 
-in vec2 v_uv;
-uniform sampler2D u_blurredBg;
-uniform sampler2D u_bg;
-uniform vec2 u_resolution;
-uniform float u_dpr;
-uniform vec2 u_mouse;
-uniform vec2 u_mouseSpring;
-uniform float u_mergeRate;
-uniform float u_shapeWidth;
-uniform float u_shapeHeight;
-uniform float u_shapeRadius;
-uniform float u_shapeRoundness;
-uniform vec4 u_tint;
-uniform float u_refThickness;
-uniform float u_refFactor;
-uniform float u_refDispersion;
-uniform float u_refFresnelRange;
-uniform float u_refFresnelFactor;
-uniform float u_refFresnelHardness;
-uniform float u_glareRange;
-uniform float u_glareConvergence;
-uniform float u_glareOppositeFactor;
-uniform float u_glareFactor;
-uniform float u_glareHardness;
-uniform float u_glareAngle;
-uniform int u_showShape1;
+// Input from vertex shader
+in vec2 v_uv;                          // UV coordinates for texture sampling
 
-uniform int STEP;
+// Input textures from previous passes
+uniform sampler2D u_blurredBg;         // Blurred background from blur passes
+uniform sampler2D u_bg;                // Original background from background pass
 
+// Rendering context
+uniform vec2 u_resolution;             // Canvas resolution in pixels
+uniform float u_dpr;                   // Device pixel ratio
+
+// Mouse interaction
+uniform vec2 u_mouse;                  // Raw mouse position
+uniform vec2 u_mouseSpring;            // Spring-smoothed mouse position
+
+// Shape definition
+uniform float u_mergeRate;             // How smoothly shapes blend
+uniform float u_shapeWidth;            // Glass shape width
+uniform float u_shapeHeight;           // Glass shape height
+uniform float u_shapeRadius;           // Corner radius
+uniform float u_shapeRoundness;        // Corner curve smoothness
+
+// Glass material properties
+uniform vec4 u_tint;                   // Glass color tint (RGBA)
+uniform float u_refThickness;          // Glass thickness for refraction
+uniform float u_refFactor;             // Refractive index (e.g., 1.5 for glass)
+uniform float u_refDispersion;         // Chromatic dispersion amount
+
+// Fresnel reflection properties
+uniform float u_refFresnelRange;       // Fresnel effect range
+uniform float u_refFresnelFactor;      // Fresnel intensity
+uniform float u_refFresnelHardness;    // Fresnel edge sharpness
+
+// Glare/highlight properties
+uniform float u_glareRange;            // Glare effect range
+uniform float u_glareConvergence;      // Glare convergence factor
+uniform float u_glareOppositeFactor;   // Opposite side glare intensity
+uniform float u_glareFactor;           // Overall glare intensity
+uniform float u_glareHardness;         // Glare edge sharpness
+uniform float u_glareAngle;            // Glare direction angle
+
+// Shape visibility
+uniform int u_showShape1;              // Whether to show first shape
+
+// Debug visualization
+uniform int STEP;                      // Debug step (0=off, 1-9=various stages)
+
+// Output color
 out vec4 fragColor;
 
+/**
+ * Signed Distance Function for perfect circles
+ * 
+ * @param p - Point to test
+ * @param r - Circle radius
+ * @return Signed distance (negative inside, positive outside)
+ */
 float sdCircle(vec2 p, float r) {
   return length(p) - r;
 }
 
+/**
+ * Advanced Superellipse SDF with gradient information
+ * 
+ * Computes signed distance to a superellipse (generalized ellipse) with
+ * customizable shape parameter. Also returns gradient information for
+ * accurate normal vector calculation.
+ * 
+ * @param p - Point to evaluate
+ * @param r - Shape radius/scale
+ * @param n - Shape parameter (2.0 = ellipse, higher = more rectangular)
+ * @return vec3(distance, gradient.x, gradient.y)
+ */
 vec3 sdSuperellipse(vec2 p, float r, float n) {
+  // Normalize by radius
   p = p / r;
-  vec2 gs = sign(p);
-  vec2 ps = abs(p);
+  vec2 gs = sign(p);  // Remember original quadrant
+  vec2 ps = abs(p);   // Work in first quadrant
+  
+  // Calculate superellipse equation: |x|^n + |y|^n = 1
   float gm = pow(ps.x, n) + pow(ps.y, n);
   float gd = pow(gm, 1.0 / n) - 1.0;
+  
+  // Calculate gradient for normal computation
   vec2 g = gs * pow(ps, vec2(n - 1.0)) * pow(gm, 1.0 / n - 1.0);
+  
+  // For accurate distance calculation, use iterative approach
   p = abs(p);
-  if (p.y > p.x) p = p.yx;
-  n = 2.0 / n;
+  if (p.y > p.x) p = p.yx;  // Work in first octant
+  
+  n = 2.0 / n;  // Transform parameter
   float s = 1.0;
-  float d = 1e20;
+  float d = 1e20;  // Initialize with large distance
+  
+  // Iterative refinement for accurate distance
   const int num = 24;
   vec2 oq = vec2(1.0, 0.0);
+  
   for (int i = 1; i < num; i++) {
     float h = float(i) / float(num - 1);
     vec2 q = vec2(pow(cos(h * PI / 4.0), n), pow(sin(h * PI / 4.0), n));
+    
+    // Find closest point on curve segment
     vec2 pa = p - oq;
     vec2 ba = q - oq;
     vec2 z = pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    
     float d2 = dot(z, z);
     if (d2 < d) {
       d = d2;
-      s = pa.x * ba.y - pa.y * ba.x;
+      s = pa.x * ba.y - pa.y * ba.x;  // Determine inside/outside
     }
     oq = q;
   }
+  
   return vec3(sqrt(d) * sign(s) * r, g);
 }
 
+/**
+ * Simplified superellipse SDF for corner regions
+ * 
+ * Faster version used specifically for rounded rectangle corners.
+ * 
+ * @param p - Point relative to corner center
+ * @param r - Corner radius
+ * @param n - Shape parameter (higher = more rectangular)
+ * @return Signed distance to corner boundary
+ */
 float superellipseCornerSDF(vec2 p, float r, float n) {
-  p = abs(p);
+  p = abs(p);  // Work in first quadrant only
   float v = pow(pow(p.x, n) + pow(p.y, n), 1.0 / n);
   return v - r;
 }
 
+/**
+ * Signed Distance Function for rounded rectangles
+ * 
+ * Creates rectangles with customizable rounded corners. The corner shape
+ * can be adjusted from circular to more rectangular using the 'n' parameter.
+ * 
+ * @param p - Point to test
+ * @param center - Rectangle center position
+ * @param width - Rectangle width
+ * @param height - Rectangle height
+ * @param cornerRadius - Radius of rounded corners
+ * @param n - Corner shape parameter
+ * @return Signed distance (negative inside, positive outside)
+ */
 float roundedRectSDF(vec2 p, vec2 center, float width, float height, float cornerRadius, float n) {
-  // Move to the center of the rectangle
+  // Translate to rectangle's local coordinate system
   p -= center;
 
+  // Scale corner radius by device pixel ratio for consistent appearance
   float cr = cornerRadius * u_dpr;
 
-  // Calculate distance to rectangle edges
+  // Calculate distance to rectangle edges (before corner rounding)
   vec2 d = abs(p) - vec2(width * u_dpr, height * u_dpr) * 0.5;
 
-  // Different treatment for edge and corner areas
   float dist;
 
+  // Determine if we're in a corner region or edge/interior region
   if (d.x > -cr && d.y > -cr) {
-    // Corner area
+    // Corner region: use superellipse for rounded corners
     vec2 cornerCenter = sign(p) * (vec2(width * u_dpr, height * u_dpr) * 0.5 - vec2(cr));
     vec2 cornerP = p - cornerCenter;
     dist = superellipseCornerSDF(cornerP, cr, n);
   } else {
-    // Inner and edge areas
+    // Edge or interior region: standard rectangle SDF
     dist = min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
   }
 
   return dist;
 }
 
+/**
+ * Smooth minimum function for organic shape blending
+ * 
+ * Combines two SDFs with smooth transitions instead of hard boolean operations.
+ * Creates the flowing, liquid-like merging effect between glass shapes.
+ * 
+ * @param a - First SDF value
+ * @param b - Second SDF value
+ * @param k - Smoothing factor (higher = smoother blend)
+ * @return Smoothly blended distance value
+ */
 float smin(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
 }
 
+/**
+ * Main glass shape SDF combining multiple elements
+ * 
+ * Defines the overall glass geometry by combining individual shapes
+ * with smooth blending. This is the core function that determines
+ * where glass effects are applied.
+ * 
+ * @param p1 - Center of first shape (circle)
+ * @param p2 - Center of second shape (rounded rectangle)
+ * @param p - Point to evaluate
+ * @return Combined signed distance to glass boundary
+ */
 float mainSDF(vec2 p1, vec2 p2, vec2 p) {
+  // Normalize coordinates to resolution-independent space
   vec2 p1n = p1 + p / u_resolution.y;
   vec2 p2n = p2 + p / u_resolution.y;
 
-  float d1 = u_showShape1 == 1 ? sdCircle(p1n, 100.0 * u_dpr / u_resolution.y) : 1.0;
+  // Shape 1: Optional circle (can be toggled on/off)
+  float d1 = u_showShape1 == 1 
+    ? sdCircle(p1n, 100.0 * u_dpr / u_resolution.y)
+    : 1.0; // Large positive value effectively disables shape
+  
+  // Shape 2: Rounded rectangle that follows mouse
   float d2 = roundedRectSDF(
     p2n,
     vec2(0.0),
@@ -123,121 +258,285 @@ float mainSDF(vec2 p1, vec2 p2, vec2 p) {
     u_shapeRoundness
   );
 
+  // Smoothly blend shapes based on merge rate parameter
   return smin(d1, d2, u_mergeRate);
 }
 
+/**
+ * Calculate surface normal using adaptive gradient estimation
+ * 
+ * Computes the surface normal vector at a point by estimating the gradient
+ * of the SDF. Uses adaptive step size based on screen-space derivatives
+ * to maintain accuracy across different zoom levels and distances.
+ * 
+ * @param p1 - Center of first shape
+ * @param p2 - Center of second shape
+ * @param p - Point where normal is calculated
+ * @return Surface normal vector (not normalized)
+ */
 vec2 getNormal(vec2 p1, vec2 p2, vec2 p) {
-  // Use scene scale adapatation eps
+  // Adaptive epsilon based on screen-space derivatives
+  // This ensures consistent normal quality regardless of zoom level
   vec2 h = vec2(max(abs(dFdx(p.x)), 0.0001), max(abs(dFdy(p.y)), 0.0001));
 
-  vec2 grad =
-    vec2(
-      mainSDF(p1, p2, p + vec2(h.x, 0.0)) - mainSDF(p1, p2, p - vec2(h.x, 0.0)),
-      mainSDF(p1, p2, p + vec2(0.0, h.y)) - mainSDF(p1, p2, p - vec2(0.0, h.y))
-    ) /
-    (2.0 * h);
+  // Central difference gradient estimation
+  // More accurate than forward difference, essential for smooth refraction
+  vec2 grad = vec2(
+    mainSDF(p1, p2, p + vec2(h.x, 0.0)) - mainSDF(p1, p2, p - vec2(h.x, 0.0)),
+    mainSDF(p1, p2, p + vec2(0.0, h.y)) - mainSDF(p1, p2, p - vec2(0.0, h.y))
+  ) / (2.0 * h);
 
+  // Scale factor to enhance normal strength for visual effects
+  // sqrt(2) * 1000 provides good balance for refraction calculations
   return grad * 1.414213562 * 1000.0;
 }
 
+/**
+ * Alternative normal calculation using diagonal sampling
+ * 
+ * Uses four diagonal samples around the point to estimate the gradient.
+ * This can provide smoother results in some cases but is more expensive
+ * than the standard central difference method.
+ * 
+ * @param p1 - Center of first shape
+ * @param p2 - Center of second shape
+ * @param p - Point where normal is calculated
+ * @return Normalized surface normal vector
+ */
 vec2 getNormal2(vec2 p1, vec2 p2, vec2 p) {
-  float eps = 0.7071 * 0.0005; // ~1/sqrt(2) * epsilon
-  vec2 e1 = vec2(1.0, 1.0);
-  vec2 e2 = vec2(-1.0, 1.0);
-  vec2 e3 = vec2(1.0, -1.0);
-  vec2 e4 = vec2(-1.0, -1.0);
+  float eps = 0.7071 * 0.0005; // Diagonal epsilon: 1/sqrt(2) * base_epsilon
+  
+  // Four diagonal direction vectors
+  vec2 e1 = vec2(1.0, 1.0);   // Northeast
+  vec2 e2 = vec2(-1.0, 1.0);  // Northwest
+  vec2 e3 = vec2(1.0, -1.0);  // Southeast
+  vec2 e4 = vec2(-1.0, -1.0); // Southwest
 
+  // Weighted sum of SDF samples in diagonal directions
+  // This creates a more isotropic gradient estimation
   return normalize(
     e1 * mainSDF(p1, p2, p + eps * e1) +
-      e2 * mainSDF(p1, p2, p + eps * e2) +
-      e3 * mainSDF(p1, p2, p + eps * e3) +
-      e4 * mainSDF(p1, p2, p + eps * e4)
+    e2 * mainSDF(p1, p2, p + eps * e2) +
+    e3 * mainSDF(p1, p2, p + eps * e3) +
+    e4 * mainSDF(p1, p2, p + eps * e4)
   );
 }
 
+/**
+ * Standard normal calculation using central differences
+ * 
+ * Clean implementation of gradient estimation using central differences
+ * in X and Y directions. More efficient than diagonal sampling.
+ * 
+ * @param p1 - Center of first shape
+ * @param p2 - Center of second shape
+ * @param p - Point where normal is calculated
+ * @return Normalized surface normal vector
+ */
 vec2 getNormal3(vec2 p1, vec2 p2, vec2 p) {
-  float eps = 0.0005;
+  float eps = 0.0005;  // Fixed epsilon for gradient estimation
   vec2 e = vec2(eps, 0.0);
 
-  float dx = mainSDF(p1, p2, p + e.xy) - mainSDF(p1, p2, p - e.xy); // ∂f/∂x
-  float dy = mainSDF(p1, p2, p + e.yx) - mainSDF(p1, p2, p - e.yx); // ∂f/∂y
+  // Central difference in X direction: ∂f/∂x
+  float dx = mainSDF(p1, p2, p + e.xy) - mainSDF(p1, p2, p - e.xy);
+  
+  // Central difference in Y direction: ∂f/∂y
+  float dy = mainSDF(p1, p2, p + e.yx) - mainSDF(p1, p2, p - e.yx);
 
   return normalize(vec2(dx, dy));
 }
 
+/**
+ * Convert HSV color space to RGB
+ * 
+ * Utility function for color space conversions. Useful for generating
+ * debug visualizations and procedural colors.
+ * 
+ * @param c - HSV color (hue, saturation, value)
+ * @return RGB color
+ */
 vec3 hsv2rgb(vec3 c) {
   vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
   vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
   return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-// from https://github.com/Rachmanin0xFF/GLSL-Color-Functions/blob/main/color-functions.glsl
-//                          0.3127/0.3290  1.0  (1.0-0.3127-0.3290)/0.329
+/**
+ * Advanced Color Space Conversion Functions
+ * 
+ * This section implements perceptually-uniform color space conversions
+ * for sophisticated color manipulation in the glass effects. The conversions
+ * allow for smooth, natural-looking color transitions and lighting effects.
+ * 
+ * Supported color spaces:
+ * - sRGB: Standard RGB color space for displays
+ * - XYZ: CIE 1931 color space (device-independent)
+ * - LAB: Perceptually uniform color space
+ * - LCH: Cylindrical representation of LAB (Lightness, Chroma, Hue)
+ * 
+ * These conversions enable:
+ * - Perceptually smooth color interpolation
+ * - Realistic lighting calculations
+ * - Natural-looking color tinting effects
+ * - Proper gamma correction
+ * 
+ * Reference: https://github.com/Rachmanin0xFF/GLSL-Color-Functions
+ */
+
+// Standard illuminant white points for color space conversions
+// D65: Standard daylight (6500K) - used for most computer displays
 const vec3 D65_WHITE = vec3(0.95045592705, 1.0, 1.08905775076);
-//                          0.3457/0.3585  1.0  (1.0-0.3457-0.3585)/0.3585
+// D50: Printing industry standard (5000K)
 const vec3 D50_WHITE = vec3(0.96429567643, 1.0, 0.82510460251);
+// Active white point (defaults to D65 for display compatibility)
 vec3 WHITE = D65_WHITE;
+
+// Color space transformation matrices
+// sRGB to CIE XYZ transformation matrix (D65 illuminant)
 const mat3 RGB_TO_XYZ_M = mat3(
-  0.4124, 0.3576, 0.1805,
-  0.2126, 0.7152, 0.0722,
-  0.0193, 0.1192, 0.9505
+  0.4124, 0.3576, 0.1805,  // X coefficients
+  0.2126, 0.7152, 0.0722,  // Y coefficients (luminance)
+  0.0193, 0.1192, 0.9505   // Z coefficients
 );
+
+// XYZ illuminant conversion matrix (D65 to D50)
 const mat3 XYZ_TO_XYZ50_M = mat3(
    1.0479298208405488  ,  0.022946793341019088, -0.05019222954313557 ,
    0.029627815688159344,  0.990434484573249   , -0.01707382502938514 ,
   -0.009243058152591178,  0.015055144896577895,  0.7518742899580008
 );
+
+// CIE XYZ to sRGB transformation matrix (inverse of RGB_TO_XYZ_M)
 const mat3 XYZ_TO_RGB_M = mat3(
    3.2406255, -1.537208 , -0.4986286,
   -0.9689307,  1.8757561,  0.0415175,
    0.0557101, -0.2040211,  1.0569959
 );
+
+// XYZ illuminant conversion matrix (D50 to D65, inverse of XYZ_TO_XYZ50_M)
 const mat3 XYZ50_TO_XYZ_M = mat3(
    0.9554734527042182  , -0.023098536874261423,  0.0632593086610217  ,
   -0.028369706963208136,  1.0099954580058226  ,  0.021041398966943008,
    0.012314001688319899, -0.020507696433477912,  1.3303659366080753
 );
+/**
+ * Remove sRGB gamma correction (linearize)
+ * 
+ * Converts sRGB values to linear RGB for accurate color calculations.
+ * sRGB uses a gamma curve to optimize perceptual uniformity on displays.
+ * 
+ * @param a - sRGB component value (0-1)
+ * @return Linear RGB value
+ */
 float UNCOMPAND_SRGB(float a) {
   return a > 0.04045
-    ? pow((a + 0.055) / 1.055, 2.4)
-    : a / 12.92;
+    ? pow((a + 0.055) / 1.055, 2.4)  // Power function for bright values
+    : a / 12.92;                      // Linear segment for dark values
 }
+
+/**
+ * Apply sRGB gamma correction
+ * 
+ * Converts linear RGB values back to sRGB for display.
+ * This ensures colors appear correctly on standard displays.
+ * 
+ * @param a - Linear RGB component value (0-1)
+ * @return sRGB value
+ */
 float COMPAND_RGB(float a) {
   return a <= 0.0031308
-    ? 12.92 * a
-    : 1.055 * pow(a, 0.41666666666) - 0.055;
+    ? 12.92 * a                              // Linear segment for dark values
+    : 1.055 * pow(a, 0.41666666666) - 0.055; // Power function for bright values
 }
+/**
+ * Convert linear RGB to CIE XYZ color space
+ * 
+ * Handles illuminant conversion based on active white point.
+ * 
+ * @param rgb - Linear RGB color
+ * @return XYZ color
+ */
 vec3 RGB_TO_XYZ(vec3 rgb) {
   return WHITE == D65_WHITE
-    ? rgb * RGB_TO_XYZ_M
-    : rgb * RGB_TO_XYZ_M * XYZ_TO_XYZ50_M;
+    ? rgb * RGB_TO_XYZ_M                    // Direct D65 conversion
+    : rgb * RGB_TO_XYZ_M * XYZ_TO_XYZ50_M;  // Convert via D50
 }
+
+/**
+ * Convert sRGB to linear RGB
+ * 
+ * @param srgb - sRGB color with gamma correction
+ * @return Linear RGB color
+ */
 vec3 SRGB_TO_RGB(vec3 srgb) {
   return vec3(UNCOMPAND_SRGB(srgb.x), UNCOMPAND_SRGB(srgb.y), UNCOMPAND_SRGB(srgb.z));
 }
+
+/**
+ * Convert linear RGB to sRGB
+ * 
+ * @param rgb - Linear RGB color
+ * @return sRGB color with gamma correction
+ */
 vec3 RGB_TO_SRGB(vec3 rgb) {
   return vec3(COMPAND_RGB(rgb.x), COMPAND_RGB(rgb.y), COMPAND_RGB(rgb.z));
 }
+
+/**
+ * Convert sRGB directly to XYZ
+ * 
+ * Convenience function combining linearization and XYZ conversion.
+ * 
+ * @param srgb - sRGB color
+ * @return XYZ color
+ */
 vec3 SRGB_TO_XYZ(vec3 srgb) {
   return RGB_TO_XYZ(SRGB_TO_RGB(srgb));
 }
+/**
+ * LAB conversion transfer function
+ * 
+ * Applies the CIE LAB transfer function with proper handling of
+ * the linear segment near zero to avoid mathematical instability.
+ * 
+ * @param x - Normalized XYZ component
+ * @return Transformed value for LAB calculation
+ */
 float XYZ_TO_LAB_F(float x) {
-  //          (24/116)^3                         1/(3*(6/29)^2)     4/29
+  // Threshold: (24/116)^3 = 0.00885645167
+  // Linear coefficient: 1/(3*(6/29)^2) = 7.78703703704
+  // Linear offset: 4/29 = 0.13793103448
   return x > 0.00885645167
-    ? pow(x, 0.333333333)
-    : 7.78703703704 * x + 0.13793103448;
+    ? pow(x, 0.333333333)              // Cube root for bright values
+    : 7.78703703704 * x + 0.13793103448; // Linear segment for dark values
 }
+
+/**
+ * Convert XYZ to CIE LAB color space
+ * 
+ * LAB is perceptually uniform, meaning equal numerical differences
+ * correspond to equal perceived color differences. Essential for
+ * natural-looking color transitions in lighting effects.
+ * 
+ * @param xyz - XYZ color
+ * @return LAB color (L=lightness, A=green-red, B=blue-yellow)
+ */
 vec3 XYZ_TO_LAB(vec3 xyz) {
+  // Normalize by white point
   vec3 xyz_scaled = xyz / WHITE;
+  
+  // Apply LAB transfer function to each component
   xyz_scaled = vec3(
     XYZ_TO_LAB_F(xyz_scaled.x),
     XYZ_TO_LAB_F(xyz_scaled.y),
     XYZ_TO_LAB_F(xyz_scaled.z)
   );
+  
+  // Calculate LAB components
   return vec3(
-    116.0 * xyz_scaled.y - 16.0,
-    500.0 * (xyz_scaled.x - xyz_scaled.y),
-    200.0 * (xyz_scaled.y - xyz_scaled.z)
+    116.0 * xyz_scaled.y - 16.0,        // L: Lightness (0-100)
+    500.0 * (xyz_scaled.x - xyz_scaled.y), // A: Green-Red axis
+    200.0 * (xyz_scaled.y - xyz_scaled.z)  // B: Blue-Yellow axis
   );
 }
 vec3 SRGB_TO_LAB(vec3 srgb) {
