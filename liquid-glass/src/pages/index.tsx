@@ -1,113 +1,339 @@
 /**
- * Original Liquid Glass Component Test Page
+ * Liquid Glass v2 Demo Page
  * 
- * Demonstrates the original liquid-glass component with interactive controls.
- * Features the CSS-based glassmorphism effect with WebGL displacement mapping
- * and elastic physics interactions.
+ * Interactive demo showcasing the liquid-glass-v2 component with comprehensive
+ * controls for all visual parameters. Allows real-time experimentation with
+ * glass effects, physics, and rendering settings.
  * 
- * This page showcases:
- * - Multiple displacement modes (standard, polar, prominent)
- * - Real-time parameter adjustment
- * - Interactive glass panels with drag functionality
- * - Various visual effect controls
- * - Performance-optimized rendering
+ * Features:
+ * - Live parameter adjustment with immediate visual feedback
+ * - Background type switching (patterns, images, videos)
+ * - Physics tuning (spring stiffness, damping, elasticity)
+ * - Visual effect controls (blur, refraction, glare, shadows)
+ * - Debug mode for development and education
  * 
- * Serves as both a demo and testing environment for the original
- * liquid glass implementation.
+ * This demo serves as both a testing environment and documentation
+ * of the component's capabilities.
  */
 
-import { useState, useRef } from "react";
+import React, { useCallback, useState } from "react";
 import { LiquidGlass } from "~/components/liquid-glass";
+import { type NextPage } from "next";
+import Head from "next/head";
+import styles from "./index.module.css";
 
 /**
- * Test page demonstrating the original liquid glass component
+ * Demo page component with interactive controls for liquid glass v2
  */
-export default function Test() {
-    /** Reference to mouse tracking container */
-    const mouseContainerRef = useRef<HTMLDivElement>(null);
-    
-    /** Visual effect parameters with interactive controls */
-    const [displacementMode] = useState<"standard" | "polar" | "prominent">("standard");
-    const [displacementScale] = useState(70);
-    const [aberrationIntensity] = useState(2);
-    const [elasticity] = useState(0.15);
-    const [saturation] = useState(140);
-    const [blurAmount] = useState(0.0625);
-
+const Demo: NextPage = () => {
     /**
-     * Common props shared across liquid glass instances
-     * Consolidates settings for consistent appearance and behavior
+     * Settings state for all liquid glass parameters
+     * Organized by category for clear parameter management
      */
-    const commonProps = {
-        padding: "16px 32px",           // Content padding
-        cornerRadius: 16,              // Border radius
-        displacementScale,             // WebGL displacement intensity
-        className: "shadow-lg",        // Additional styling
-        mode: displacementMode,        // Visual displacement mode
-        aberrationIntensity,           // Chromatic aberration strength
-        elasticity,                    // Physics responsiveness
-        blurAmount,                    // Backdrop blur intensity
-        saturation,                    // Color saturation
-        border: true,                  // Enable border effects
-        draggable: true,               // Enable drag functionality
-    };
+    const [settings, setSettings] = useState({
+        // Canvas settings - control rendering dimensions
+        width: 600,
+        height: 400,
 
-    /** Active tab state for demo navigation */
-    const [activeTab, setActiveTab] = useState("home");
+        // Background settings - control scene content
+        backgroundType: 0,          // 0=pattern, 10+=texture
+        backgroundImage: "",        // URL for background image
+
+        // Shape settings - control glass geometry
+        shapeWidth: 200,           // Glass shape width in pixels
+        shapeHeight: 200,          // Glass shape height in pixels
+        shapeRadius: 80,           // Corner radius (0-100)
+        shapeRoundness: 5,         // Corner curve smoothness
+        showShape: true,           // Whether to show optional shapes
+        mergeRate: 0.05,          // How smoothly shapes blend
+
+        // Mouse interaction - control physics behavior
+        enableMouseTracking: true,  // Enable mouse following
+        springStiffness: 80,       // Spring responsiveness
+        springDamping: 40,         // Spring damping factor
+        springSizeFactor: 10,      // Velocity-based shape morphing
+
+        // Blur settings
+        blurRadius: 1,
+
+        // Shadow settings
+        shadowExpand: 25,
+        shadowFactor: 15,
+        shadowPosition: { x: 0, y: -10 },
+
+        // Glass tint
+        tint: { r: 255, g: 255, b: 255, a: 0 },
+
+        // Refraction settings
+        refractionThickness: 20,
+        refractionFactor: 1.4,
+        refractionDispersion: 7,
+        refractionFresnelRange: 30,
+        refractionFresnelHardness: 20,
+        refractionFresnelFactor: 20,
+
+        // Glare settings
+        glareAngle: -45,
+        glareRange: 30,
+        glareHardness: 20,
+        glareConvergence: 50,
+        glareOppositeFactor: 80,
+        glareFactor: 90,
+
+        // Debug
+        debugStep: 9,
+    });
+
+    const updateSetting = useCallback((key: string, value: string | number | boolean) => {
+        setSettings((prev) => ({
+            ...prev,
+            [key]: value,
+        }));
+    }, []);
+
+    const updateNestedSetting = useCallback((parent: string, key: string, value: string | number | boolean) => {
+        setSettings((prev) => ({
+            ...prev,
+            [parent]: {
+                ...(prev[parent as keyof typeof prev] as Record<string, unknown>),
+                [key]: value,
+            },
+        }));
+    }, []);
+
+    const [glSupported, setGlSupported] = useState<boolean | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleReady = useCallback((gl: WebGL2RenderingContext) => {
+        console.log("WebGL2 context ready:", gl);
+        setGlSupported(true);
+        setError(null);
+    }, []);
+
+    const handleError = useCallback((error: Error) => {
+        console.error("LiquidGlass error:", error);
+        setGlSupported(false);
+        setError(error.message);
+    }, []);
 
     return (
         <>
-            <main ref={mouseContainerRef} className="relative min-h-screen overflow-auto">
-                {/* Background content matching example 2 */}
-                <div className="absolute top-0 left-0 mb-96 min-h-[200vh] w-full pb-96">
-                    <img src="https://picsum.photos/2000/2000" className="h-96 w-full object-cover" alt="Background demonstration image" />
-                    <div className="flex flex-col gap-2" id="bright-section">
-                        <h2 className="my-5 text-center text-2xl font-semibold">Enhanced Liquid Glass Demo</h2>
-                        <p className="px-10 text-center">
-                            Experience advanced liquid glass effects with multiple displacement modes, chromatic aberration, and elastic interactions.
-                            <br />
-                            Drag the glass components around the screen and experiment with different settings using the controls.
-                            <br />
-                            The enhanced implementation includes all features from example 2 while maintaining drag functionality.
-                            <br />
-                            Switch between Original and Enhanced modes to compare the different implementations.
-                            <br />
-                            Each displacement mode creates unique visual distortion patterns for varied aesthetic effects.
-                            <br />
-                            Real-time controls allow fine-tuning of saturation, blur, elasticity, and aberration intensity.
-                        </p>
+            <Head>
+                <title>Liquid Glass Demo</title>
+                <meta name="description" content="Interactive demo of the Liquid Glass component" />
+                <link rel="icon" href="/favicon.ico" />
+            </Head>
+
+            <div className={styles.container}>
+                <header className={styles.header}>
+                    <h1>Liquid Glass Demo</h1>
+                    <p>Interactive showcase of advanced liquid glass effects</p>
+                </header>
+
+                <div className={styles.content}>
+                    <div className={styles.demo}>
+                        <div className={styles.glassContainer}>
+                            {glSupported === false ? (
+                                <div className={styles.error}>
+                                    <h3>WebGL2 Not Supported</h3>
+                                    <p>{error}</p>
+                                    <p>Please use a modern browser with WebGL2 support.</p>
+                                </div>
+                            ) : (
+                                <LiquidGlass width={settings.width} height={settings.height} backgroundType={settings.backgroundType} backgroundImage={settings.backgroundImage} shapeWidth={settings.shapeWidth} shapeHeight={settings.shapeHeight} shapeRadius={settings.shapeRadius} shapeRoundness={settings.shapeRoundness} showShape={settings.showShape} mergeRate={settings.mergeRate} enableMouseTracking={settings.enableMouseTracking} springStiffness={settings.springStiffness} springDamping={settings.springDamping} springSizeFactor={settings.springSizeFactor} blurRadius={settings.blurRadius} shadowExpand={settings.shadowExpand} shadowFactor={settings.shadowFactor} shadowPosition={settings.shadowPosition} tint={settings.tint} refractionThickness={settings.refractionThickness} refractionFactor={settings.refractionFactor} refractionDispersion={settings.refractionDispersion} refractionFresnelRange={settings.refractionFresnelRange} refractionFresnelHardness={settings.refractionFresnelHardness} refractionFresnelFactor={settings.refractionFresnelFactor} glareAngle={settings.glareAngle} glareRange={settings.glareRange} glareHardness={settings.glareHardness} glareConvergence={settings.glareConvergence} glareOppositeFactor={settings.glareOppositeFactor} glareFactor={settings.glareFactor} debugStep={settings.debugStep} onReady={handleReady} onError={handleError} className={styles.liquidGlass}>
+                                    <div className={styles.glassContent}>
+                                        <h2>Liquid Glass Studio</h2>
+                                        <p>Move your mouse to interact with the glass effect</p>
+                                        <div className={styles.glassStats}>
+                                            <div>WebGL2: {glSupported ? "✓" : "?"}</div>
+                                            <div>Multi-pass: ✓</div>
+                                            <div>Blur: ✓</div>
+                                            <div>Refraction: ✓</div>
+                                        </div>
+                                    </div>
+                                </LiquidGlass>
+                            )}
+                        </div>
                     </div>
-                    <img src="https://picsum.photos/1200/1200" className="my-10 h-80 w-full object-cover" alt="Demonstration image 2" />
-                    <img src="https://picsum.photos/1400/1300" className="my-10 h-72 w-full object-cover" alt="Demonstration image 3" />
-                    <img src="https://picsum.photos/1100/1200" className="my-10 mb-96 h-96 w-full object-cover" alt="Demonstration image 4" />
+
+                    <div className={styles.controls}>
+                        <div className={styles.controlGroup}>
+                            <h3>Canvas</h3>
+                            <div className={styles.controlRow}>
+                                <label>Width:</label>
+                                <input type="range" min="300" max="800" value={settings.width} onChange={(e) => updateSetting("width", parseInt(e.target.value))} />
+                                <span>{settings.width}px</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Height:</label>
+                                <input type="range" min="200" max="600" value={settings.height} onChange={(e) => updateSetting("height", parseInt(e.target.value))} />
+                                <span>{settings.height}px</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.controlGroup}>
+                            <h3>Shape</h3>
+                            <div className={styles.controlRow}>
+                                <label>Width:</label>
+                                <input type="range" min="100" max="500" value={settings.shapeWidth} onChange={(e) => updateSetting("shapeWidth", parseInt(e.target.value))} />
+                                <span>{settings.shapeWidth}px</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Height:</label>
+                                <input type="range" min="100" max="500" value={settings.shapeHeight} onChange={(e) => updateSetting("shapeHeight", parseInt(e.target.value))} />
+                                <span>{settings.shapeHeight}px</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Radius:</label>
+                                <input type="range" min="0" max="100" value={settings.shapeRadius} onChange={(e) => updateSetting("shapeRadius", parseInt(e.target.value))} />
+                                <span>{settings.shapeRadius}%</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Roundness:</label>
+                                <input type="range" min="1" max="10" step="0.1" value={settings.shapeRoundness} onChange={(e) => updateSetting("shapeRoundness", parseFloat(e.target.value))} />
+                                <span>{settings.shapeRoundness}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>
+                                    <input type="checkbox" checked={settings.showShape} onChange={(e) => updateSetting("showShape", e.target.checked)} />
+                                    Show Shape
+                                </label>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Merge Rate:</label>
+                                <input type="range" min="0" max="0.3" step="0.01" value={settings.mergeRate} onChange={(e) => updateSetting("mergeRate", parseFloat(e.target.value))} />
+                                <span>{settings.mergeRate}</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.controlGroup}>
+                            <h3>Mouse Interaction</h3>
+                            <div className={styles.controlRow}>
+                                <label>
+                                    <input type="checkbox" checked={settings.enableMouseTracking} onChange={(e) => updateSetting("enableMouseTracking", e.target.checked)} />
+                                    Mouse Tracking
+                                </label>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Spring Stiffness:</label>
+                                <input type="range" min="50" max="500" value={settings.springStiffness} onChange={(e) => updateSetting("springStiffness", parseInt(e.target.value))} />
+                                <span>{settings.springStiffness}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Spring Damping:</label>
+                                <input type="range" min="10" max="100" value={settings.springDamping} onChange={(e) => updateSetting("springDamping", parseInt(e.target.value))} />
+                                <span>{settings.springDamping}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Size Factor:</label>
+                                <input type="range" min="0" max="100" value={settings.springSizeFactor} onChange={(e) => updateSetting("springSizeFactor", parseInt(e.target.value))} />
+                                <span>{settings.springSizeFactor}%</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.controlGroup}>
+                            <h3>Blur & Shadow</h3>
+                            <div className={styles.controlRow}>
+                                <label>Blur Radius:</label>
+                                <input type="range" min="0" max="100" value={settings.blurRadius} onChange={(e) => updateSetting("blurRadius", parseInt(e.target.value))} />
+                                <span>{settings.blurRadius}px</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Shadow Expand:</label>
+                                <input type="range" min="0" max="100" value={settings.shadowExpand} onChange={(e) => updateSetting("shadowExpand", parseInt(e.target.value))} />
+                                <span>{settings.shadowExpand}px</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Shadow Factor:</label>
+                                <input type="range" min="0" max="100" value={settings.shadowFactor} onChange={(e) => updateSetting("shadowFactor", parseInt(e.target.value))} />
+                                <span>{settings.shadowFactor}%</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.controlGroup}>
+                            <h3>Refraction</h3>
+                            <div className={styles.controlRow}>
+                                <label>Thickness:</label>
+                                <input type="range" min="0" max="100" value={settings.refractionThickness} onChange={(e) => updateSetting("refractionThickness", parseInt(e.target.value))} />
+                                <span>{settings.refractionThickness}px</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Factor:</label>
+                                <input type="range" min="0" max="3" step="0.1" value={settings.refractionFactor} onChange={(e) => updateSetting("refractionFactor", parseFloat(e.target.value))} />
+                                <span>{settings.refractionFactor}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Dispersion:</label>
+                                <input type="range" min="0" max="50" value={settings.refractionDispersion} onChange={(e) => updateSetting("refractionDispersion", parseInt(e.target.value))} />
+                                <span>{settings.refractionDispersion}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Fresnel Range:</label>
+                                <input type="range" min="0" max="100" value={settings.refractionFresnelRange} onChange={(e) => updateSetting("refractionFresnelRange", parseInt(e.target.value))} />
+                                <span>{settings.refractionFresnelRange}</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.controlGroup}>
+                            <h3>Glare</h3>
+                            <div className={styles.controlRow}>
+                                <label>Angle:</label>
+                                <input type="range" min="0" max="360" value={settings.glareAngle} onChange={(e) => updateSetting("glareAngle", parseInt(e.target.value))} />
+                                <span>{settings.glareAngle}°</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Range:</label>
+                                <input type="range" min="0" max="500" value={settings.glareRange} onChange={(e) => updateSetting("glareRange", parseInt(e.target.value))} />
+                                <span>{settings.glareRange}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Factor:</label>
+                                <input type="range" min="0" max="100" value={settings.glareFactor} onChange={(e) => updateSetting("glareFactor", parseInt(e.target.value))} />
+                                <span>{settings.glareFactor}%</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.controlGroup}>
+                            <h3>Tint</h3>
+                            <div className={styles.controlRow}>
+                                <label>Red:</label>
+                                <input type="range" min="0" max="255" value={settings.tint.r} onChange={(e) => updateNestedSetting("tint", "r", parseInt(e.target.value))} />
+                                <span>{settings.tint.r}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Green:</label>
+                                <input type="range" min="0" max="255" value={settings.tint.g} onChange={(e) => updateNestedSetting("tint", "g", parseInt(e.target.value))} />
+                                <span>{settings.tint.g}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Blue:</label>
+                                <input type="range" min="0" max="255" value={settings.tint.b} onChange={(e) => updateNestedSetting("tint", "b", parseInt(e.target.value))} />
+                                <span>{settings.tint.b}</span>
+                            </div>
+                            <div className={styles.controlRow}>
+                                <label>Alpha:</label>
+                                <input type="range" min="0" max="1" step="0.01" value={settings.tint.a} onChange={(e) => updateNestedSetting("tint", "a", parseFloat(e.target.value))} />
+                                <span>{settings.tint.a.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.controlGroup}>
+                            <h3>Debug</h3>
+                            <div className={styles.controlRow}>
+                                <label>Debug Step:</label>
+                                <input type="range" min="0" max="10" value={settings.debugStep} onChange={(e) => updateSetting("debugStep", parseInt(e.target.value))} />
+                                <span>{settings.debugStep}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <LiquidGlass {...commonProps} initialPosition={{ x: 600, y: 350 }} mouseContainer={mouseContainerRef}>
-                    <nav className="flex items-center space-x-6 text-white">
-                        <div className="text-lg font-bold">Standard Glass</div>
-                        <div className="flex space-x-4">
-                            {["Home", "About", "Services", "Contact"].map((item) => (
-                                <button key={item} onClick={() => setActiveTab(item.toLowerCase())} className={`rounded-lg px-3 py-2 transition-all ${activeTab === item.toLowerCase() ? "bg-white/30 text-yellow-300" : "hover:bg-white/20"}`}>
-                                    {item}
-                                </button>
-                            ))}
-                        </div>
-                    </nav>
-                </LiquidGlass>
-
-                <LiquidGlass {...commonProps} initialPosition={{ x: 50, y: 100 }} mouseContainer={mouseContainerRef}>
-                    <nav className="flex items-center space-x-6 text-white">
-                        <div className="text-lg font-bold">Standard Glass</div>
-                        <div className="flex space-x-4">
-                            {["Home", "About", "Services", "Contact"].map((item) => (
-                                <button key={item} onClick={() => setActiveTab(item.toLowerCase())} className={`rounded-lg px-3 py-2 transition-all ${activeTab === item.toLowerCase() ? "bg-white/30 text-yellow-300" : "hover:bg-white/20"}`}>
-                                    {item}
-                                </button>
-                            ))}
-                        </div>
-                    </nav>
-                </LiquidGlass>
-            </main>
+                <footer className={styles.footer}>
+                    <p>Built with WebGL2 and React • Advanced multi-pass rendering pipeline</p>
+                </footer>
+            </div>
         </>
     );
-}
+};
+
+export default Demo;
