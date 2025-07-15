@@ -210,8 +210,8 @@ class SpringController {
      * @param deltaTime - Time elapsed since last update in milliseconds
      */
     update(deltaTime: number) {
-        // Cap delta time to prevent instability from frame drops
-        const dt = Math.min(deltaTime / 1000, 0.1);
+        // Cap delta time more aggressively to prevent instability
+        const dt = Math.min(deltaTime / 1000, 0.016); // Cap at ~60fps interval
 
         // Calculate displacement from target
         const dx = this.target.x - this.value.x;
@@ -221,35 +221,36 @@ class SpringController {
         const ax = dx * this.stiffness - this.velocity.x * this.damping;
         const ay = dy * this.stiffness - this.velocity.y * this.damping;
 
-        // Integrate acceleration to get velocity
-        this.velocity.x += ax * dt;
-        this.velocity.y += ay * dt;
+        // Integrate acceleration to get velocity with stability checks
+        const newVelX = this.velocity.x + ax * dt;
+        const newVelY = this.velocity.y + ay * dt;
+
+        // Prevent velocity from becoming too extreme
+        const maxVelocity = 10000; // pixels per second
+        this.velocity.x = Math.max(-maxVelocity, Math.min(maxVelocity, newVelX));
+        this.velocity.y = Math.max(-maxVelocity, Math.min(maxVelocity, newVelY));
 
         // Integrate velocity to get position
         this.value.x += this.velocity.x * dt;
         this.value.y += this.velocity.y * dt;
 
-        // Calculate display velocity for visual effects
-        // This provides a smooth velocity measurement for shape morphing
+        // Calculate display velocity for visual effects with smoothing
         const now = Date.now();
-        if (this.lastTime) {
-            const realDt = now - this.lastTime;
+        if (this.lastTime && now - this.lastTime > 0) {
+            const realDt = Math.max(1, now - this.lastTime); // Prevent division by zero
             const valueDx = this.value.x - this.lastValue.x;
             const valueDy = this.value.y - this.lastValue.y;
 
-            // Convert to velocity in pixels per millisecond
+            // Convert to velocity in pixels per millisecond with bounds checking
             const speed = {
-                x: valueDx / realDt,
-                y: valueDy / realDt,
+                x: Math.abs(valueDx / realDt) < 100 ? valueDx / realDt : 0, // Reset if too extreme
+                y: Math.abs(valueDy / realDt) < 100 ? valueDy / realDt : 0, // Reset if too extreme
             };
 
-            // Prevent numerical instability from extreme values
-            if (Math.abs(speed.x) > 1e10 || Math.abs(speed.y) > 1e10) {
-                speed.x = 0;
-                speed.y = 0;
-            }
-
-            this.displayVelocity = speed;
+            // Smooth the display velocity to prevent sudden jumps
+            const smoothFactor = 0.1;
+            this.displayVelocity.x = this.displayVelocity.x * (1 - smoothFactor) + speed.x * smoothFactor;
+            this.displayVelocity.y = this.displayVelocity.y * (1 - smoothFactor) + speed.y * smoothFactor;
         }
 
         this.lastValue = { ...this.value };
@@ -262,6 +263,20 @@ class SpringController {
 
     getVelocity() {
         return this.displayVelocity;
+    }
+
+    /**
+     * Update spring stiffness without recreating the controller
+     */
+    setStiffness(stiffness: number) {
+        this.stiffness = stiffness;
+    }
+
+    /**
+     * Update spring damping without recreating the controller
+     */
+    setDamping(damping: number) {
+        this.damping = damping;
     }
 }
 
@@ -304,10 +319,12 @@ export const LiquidGlass: React.FC<LiquidGlassProps> = ({ children, className, s
     const animationFrameRef = useRef<number | null>(null);
     const springRef = useRef<SpringController>(new SpringController({ x: canvasSize.width / 2, y: canvasSize.height / 2 }, springStiffness, springDamping));
 
-    // Update spring parameters when they change
+    // Update spring parameters when they change without recreating the controller
     useEffect(() => {
         if (springRef.current) {
-            springRef.current = new SpringController(springRef.current.getValue(), springStiffness, springDamping);
+            // Update parameters in place to preserve state
+            springRef.current.setStiffness(springStiffness);
+            springRef.current.setDamping(springDamping);
         }
     }, [springStiffness, springDamping]);
     const lastTimeRef = useRef<number>(0);
@@ -455,23 +472,46 @@ export const LiquidGlass: React.FC<LiquidGlassProps> = ({ children, className, s
         if (!enableMouseTracking || !containerRef.current) return;
 
         const container = containerRef.current;
+        let rafId: number | null = null;
+        let pendingUpdate = false;
 
         const handlePointerMove = (e: PointerEvent) => {
-            const rect = container.getBoundingClientRect();
-            const relativeX = e.clientX - rect.left;
-            const relativeY = e.clientY - rect.top;
+            if (pendingUpdate) return; // Throttle updates to prevent overwhelming the spring
 
-            mousePositionRef.current = {
+            const rect = container.getBoundingClientRect();
+            
+            // Ensure coordinates are within bounds
+            const relativeX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+            const relativeY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+
+            const newPosition = {
                 x: relativeX * canvasSize.dpr,
                 y: (rect.height - relativeY) * canvasSize.dpr,
             };
-            springRef.current.setTarget(mousePositionRef.current);
+
+            // Only update if position has changed significantly (reduces jitter)
+            const currentPos = mousePositionRef.current;
+            const dx = Math.abs(newPosition.x - currentPos.x);
+            const dy = Math.abs(newPosition.y - currentPos.y);
+            
+            if (dx > 1 || dy > 1) { // 1 pixel threshold
+                pendingUpdate = true;
+                rafId = requestAnimationFrame(() => {
+                    mousePositionRef.current = newPosition;
+                    springRef.current.setTarget(newPosition);
+                    pendingUpdate = false;
+                    rafId = null;
+                });
+            }
         };
 
-        container.addEventListener("pointermove", handlePointerMove);
+        container.addEventListener("pointermove", handlePointerMove, { passive: true });
 
         return () => {
             container.removeEventListener("pointermove", handlePointerMove);
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+            }
         };
     }, [enableMouseTracking, canvasSize]);
 
