@@ -543,22 +543,6 @@ export const LiquidGlass: React.FC<LiquidGlassProps> = ({ children, className, s
                 u_showShape1: showShape ? 1 : 0,
             });
 
-            // Debug logging (remove after testing)
-            if (time % 1000 < 16) {
-                // Log once per second
-                console.log("Detailed debug:", {
-                    canvasActual: `${canvas.width}x${canvas.height}`,
-                    canvasSettings: `${canvasSize.width}x${canvasSize.height}`,
-                    canvasProps: `${width}x${height}`,
-                    dpr: canvasSize.dpr,
-                    mouseSpring: `${springValue.x.toFixed(1)}, ${springValue.y.toFixed(1)}`,
-                    shapeSize: `${shapeSizeSpring.x.toFixed(1)}x${shapeSizeSpring.y.toFixed(1)}`,
-                    shapeRadius: ((Math.min(shapeSizeSpring.x, shapeSizeSpring.y) / 2) * shapeRadius) / 100,
-                    showShape,
-                    debugStep,
-                    mergeRate,
-                });
-            }
 
             // Render passes with specific uniforms
             const bgPassUniforms: Record<string, RenderUniformValue> = {
